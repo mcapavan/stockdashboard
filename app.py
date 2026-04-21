@@ -7,7 +7,7 @@ from plotly.subplots import make_subplots
 from datetime import timedelta
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Strategy Dashboard Pro", layout="wide")
+st.set_page_config(page_title="Stocks Strategy Dashboard Pro", layout="wide")
 
 # --- DATA FETCHING ---
 @st.cache_data(ttl=3600)
@@ -17,7 +17,31 @@ def get_data(ticker):
 
 # Sidebar Ticker Input
 st.sidebar.header("🕹️ Strategy Controls")
-ticker_symbol = st.sidebar.text_input("Stock Ticker", value="RIVN").upper()
+# --- SEARCHABLE DROPDOWN WITH COMPANY NAMES ---
+ticker_dict = {
+    "Rivian Automotive (RIVN)": "RIVN",
+    "Nio Inc. (NIO)": "NIO",
+    "XPeng Inc. (XPEV)": "XPEV",
+    "Tesla, Inc. (TSLA)": "TSLA",
+    "Apple Inc. (AAPL)": "AAPL",
+    "Microsoft Corp (MSFT)": "MSFT",
+    "Alphabet Inc (GOOGL)": "GOOGL",
+    "Amazon.com Inc (AMZN)": "AMZN",
+    "NVIDIA Corp (NVDA)": "NVDA",
+    "Intel Corp (INTC)": "INTC"
+}
+
+# The selectbox shows the friendly name (keys)
+selected_name = st.sidebar.selectbox(
+    "Search or Select Stock", 
+    options=list(ticker_dict.keys()),
+    index=0  # Defaults to Rivian
+)
+
+# This extracts the actual ticker for yfinance to use
+ticker_symbol = ticker_dict[selected_name]
+
+#ticker_symbol = st.sidebar.text_input("Stock Ticker", value="RIVN").upper()
 
 data = get_data(ticker_symbol)
 
@@ -85,7 +109,12 @@ if data is not None:
     latest_row = data.iloc[-1]
 
     # --- 3. UI HEADER ---
-    st.title(f"📊 {ticker_symbol} Strategy Dashboard")
+    # Add this inside your 'if data is not None:' block
+    try:
+        company_name = yf.Ticker(ticker_symbol).info.get('longName', ticker_symbol)
+        st.title(f"📊 {company_name} Strategy Dashboard")
+    except:
+        st.title(f"📊 {ticker_symbol} Strategy Dashboard")
     
     c1, c2, c3 = st.columns(3)
     with c1: st.metric("Price", f"${latest_row['Close']:.2f}", delta=f"{latest_row['Price Change']:.2f}%")
