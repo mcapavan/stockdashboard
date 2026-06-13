@@ -31,17 +31,6 @@ ticker_dict = {
     "Intel Corp (INTC)": "INTC"
 }
 
-# # The selectbox shows the friendly name (keys)
-# selected_name = st.sidebar.selectbox(
-#     "Search or Select Stock", 
-#     options=list(ticker_dict.keys()),
-#     index=0  # Defaults to Rivian
-# )
-
-# This extracts the actual ticker for yfinance to use
-# ticker_symbol = ticker_dict[selected_name]
-#ticker_symbol = st.sidebar.text_input("Stock Ticker", value="RIVN").upper()
-
 # --- TICKER SELECTION MODE ---
 selected_name = st.sidebar.selectbox(
     "Search or Select Stock",
