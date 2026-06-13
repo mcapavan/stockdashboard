@@ -38,32 +38,11 @@ ticker_dict = {
 #     index=0  # Defaults to Rivian
 # )
 
-
-# # --- TICKER SELECTION MODE ---
-# selection_mode = st.sidebar.radio(
-#     "Choose Input Method",
-#     ["Select from List", "Enter Manually"]
-# )
-
-# if selection_mode == "Select from List":
-#     selected_name = st.sidebar.selectbox(
-#         "Search or Select Stock",
-#         options=list(ticker_dict.keys()),
-#         index=0
-#     )
-#     ticker_symbol = ticker_dict[selected_name]
-
-# else:
-#     ticker_symbol = st.sidebar.text_input(
-#         "Enter Stock Ticker",
-#         value="RIVN"
-#     ).upper()
-
-
 # This extracts the actual ticker for yfinance to use
 # ticker_symbol = ticker_dict[selected_name]
 #ticker_symbol = st.sidebar.text_input("Stock Ticker", value="RIVN").upper()
 
+# --- TICKER SELECTION MODE ---
 selected_name = st.sidebar.selectbox(
     "Search or Select Stock",
     options=["-- Enter Manually --"] + list(ticker_dict.keys()),
