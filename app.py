@@ -31,17 +31,49 @@ ticker_dict = {
     "Intel Corp (INTC)": "INTC"
 }
 
-# The selectbox shows the friendly name (keys)
-selected_name = st.sidebar.selectbox(
-    "Search or Select Stock", 
-    options=list(ticker_dict.keys()),
-    index=0  # Defaults to Rivian
-)
+# # The selectbox shows the friendly name (keys)
+# selected_name = st.sidebar.selectbox(
+#     "Search or Select Stock", 
+#     options=list(ticker_dict.keys()),
+#     index=0  # Defaults to Rivian
+# )
+
+
+# # --- TICKER SELECTION MODE ---
+# selection_mode = st.sidebar.radio(
+#     "Choose Input Method",
+#     ["Select from List", "Enter Manually"]
+# )
+
+# if selection_mode == "Select from List":
+#     selected_name = st.sidebar.selectbox(
+#         "Search or Select Stock",
+#         options=list(ticker_dict.keys()),
+#         index=0
+#     )
+#     ticker_symbol = ticker_dict[selected_name]
+
+# else:
+#     ticker_symbol = st.sidebar.text_input(
+#         "Enter Stock Ticker",
+#         value="RIVN"
+#     ).upper()
+
 
 # This extracts the actual ticker for yfinance to use
-ticker_symbol = ticker_dict[selected_name]
-
+# ticker_symbol = ticker_dict[selected_name]
 #ticker_symbol = st.sidebar.text_input("Stock Ticker", value="RIVN").upper()
+
+selected_name = st.sidebar.selectbox(
+    "Search or Select Stock",
+    options=["-- Enter Manually --"] + list(ticker_dict.keys()),
+    index=1
+)
+
+if selected_name == "-- Enter Manually --":
+    ticker_symbol = st.sidebar.text_input("Enter Stock Ticker", value="RIVN").upper()
+else:
+    ticker_symbol = ticker_dict[selected_name]
 
 data = get_data(ticker_symbol)
 
