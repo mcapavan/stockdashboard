@@ -256,6 +256,10 @@ if data is not None:
     data[['Signal', 'Color', 'Reason', 'Conviction']] = pd.DataFrame(res.tolist(), index=data.index)
     latest_row = data.iloc[-1]
 
+    signal_date = data.index[-2]
+    signal_text = data.iloc[-2]["Signal"]
+    signal_date_str = signal_date.strftime("%d %b %Y")
+
     try:
         # forecast = get_forecast(data)
         forecast = get_forecast(
@@ -268,6 +272,14 @@ if data is not None:
         future_price = latest_row['Close']
 
     sent_score, sent_label = get_sentiment(ticker_symbol)
+
+    # Display-friendly News Sentiment
+    if "Bullish" in sent_label:
+        display_sentiment = "📰 Bullish"
+    elif "Bearish" in sent_label:
+        display_sentiment = "📰 Bearish"
+    else:
+        display_sentiment = "📰 Neutral"
 
     analyst_target = get_analyst_target(
         ticker_symbol
@@ -303,6 +315,12 @@ if data is not None:
     except:
         st.title(f"📊 {ticker_symbol}")
     
+    previous_signal = data.iloc[-2]["Signal"]
+
+    st.caption(
+        f"Signal ({signal_date_str}): {signal_text}"
+    )
+    
     # ==================================================
     # EXECUTIVE SUMMARY
     # ==================================================
@@ -326,56 +344,20 @@ if data is not None:
 
 
     if bull_points >= 4:
-        stance = "🟢 BULLISH"
+        stance = "🟢 Bullish"
 
     elif bull_points >= 3:
-        stance = "🟡 MODERATELY BULLISH"
+        stance = "🟡 Neutral++"
 
     elif bull_points == 2:
-        stance = "🟠 NEUTRAL"
+        stance = "🟠 Neutral"
 
     else:
-        stance = "🔴 BEARISH"
-
-
-    bear_case = latest_row['Close'] * 0.85
-    base_case = latest_row['Close'] * 1.10
-    bull_case = latest_row['Close'] * 1.30
+        stance = "🔴 Bearish"
 
     st.markdown("---")
-
-    bull_points = 0
-
-    if latest_row['Close'] > latest_row['EMA_20']:
-        bull_points += 1
-
-    if latest_row['RSI_14'] > 50:
-        bull_points += 1
-
-    if sent_score > 0:
-        bull_points += 1
-
-    if future_price > latest_row['Close']:
-        bull_points += 1
-
-    if analyst_target and analyst_target > latest_row['Close']:
-        bull_points += 1
-
-    if bull_points >= 4:
-        stance = "🟢 BULLISH"
-        stance_color = "green"
-
-    elif bull_points >= 3:
-        stance = "🟡 MODERATELY BULLISH"
-        stance_color = "orange"
-
-    elif bull_points == 2:
-        stance = "🟠 NEUTRAL"
-
-    else:
-        stance = "🔴 BEARISH"
-
     # Executive Dashboard
+
     top1, top2, top3, top4, top5 = st.columns(5)
 
     with top1:
@@ -384,83 +366,29 @@ if data is not None:
             f"${latest_row['Close']:.2f}",
             f"{latest_row['Price Change']:.2f}%"
         )
+   
     with top2:
         st.metric(
-            "Investment View",
-            stance
+            "Forecast Target",
+            f"${future_price:.2f}",
+            f"{forecast_upside:.1f}%"
         )
     with top3:
-        st.metric(
-            "Expected Return",
-            f"{forecast_upside:.1f}%"
+        st.metric(            
+            "Analyst Target",
+            f"${analyst_target:.2f}",
+            f"{target_upside:.1f}%"
         )
     with top4:
         st.metric(
-            "Quant Score",
-            f"{quant_score}/100"
+            "News Sentiment",
+            display_sentiment
         )
     with top5:
         st.metric(
-            "News Sentiment",
-            sent_label
-        )
-
-    # Scenario Analysis
-    st.markdown("---")
-    st.subheader("🎯 Price Scenarios")
-    s1,s2,s3 = st.columns(3)
-
-    with s1:
-        st.metric(
-            "🐻 Bear Case",
-            f"${bear_case:.2f}",
-            "-15%"
-        )
-
-    with s2:
-        st.metric(
-            "⚖️ Base Case",
-            f"${base_case:.2f}",
-            "+10%"
-        )
-
-    with s3:
-        st.metric(
-            "🚀 Bull Case",
-            f"${bull_case:.2f}",
-            "+30%"
-        )
-
-    # st.info(
-    #     f"""
-    #     🚀 Momentum Buy | Sentiment: {sent_label}
-    #     | Analyst Target: ${analyst_target:.2f}
-    #     | Forecast: ${future_price:.2f}
-    #     """
-    # )
-    # summary1, summary2, summary3, summary4 = st.columns(4)
-
-    # with summary1:
-    #     st.metric(
-    #         "Current Price",
-    #         f"${latest_row['Close']:.2f}",
-    #         f"{latest_row['Price Change']:.2f}%"
-    #     )
-    # with summary2:
-    #     st.metric(
-    #         "Sentiment",
-    #         sent_label.replace("🟢 ","").replace("🟡 ","")
-    #     )
-    # with summary3:
-    #     st.metric(
-    #         "Forecast",
-    #         f"${future_price:.2f}"
-    #     )
-    # with summary4:
-    #     st.metric(
-    #         "Expected Return",
-    #         f"{forecast_upside:.1f}%"
-    #     )
+            "Investment View",
+            stance
+        )    
 
 # --- 5. COMPACT CHART ---
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=[0.85, 0.15])
@@ -475,7 +403,8 @@ if data is not None:
     fig.add_trace(go.Bar(x=data.index, y=data['Volume'], name="Volume", marker_color=colors, opacity=0.4), row=2, col=1)
 
     fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=550, hovermode="x unified",
-                      xaxis=dict(range=[data.index[-90], data.index[-1]]))
+                        margin=dict(t=10,b=20,l=20,r=20),
+                        xaxis=dict(range=[data.index[-90], data.index[-1]]))
     
     # show technical chart
     st.markdown("---")
@@ -542,10 +471,14 @@ if data is not None:
             )
         )
 
-        forecast_fig.update_layout(
-            template="plotly_dark",
-            height=450
-        )
+        # forecast_fig.update_layout(
+        #     template="plotly_dark",
+        #     height=450
+        # )
+
+        forecast_fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=450, hovermode="x unified",
+                        margin=dict(t=10,b=20,l=20,r=20))
+
         # show forecast chart
         st.markdown("---")
         st.subheader("🔮 Forecast Analysis")
