@@ -289,9 +289,12 @@ if data is not None:
         (future_price / latest_row['Close']) - 1
     ) * 100
     
-    target_upside = (
-        (analyst_target / latest_row['Close']) - 1
-    ) * 100
+    if analyst_target is not None:
+        target_upside = (
+            (analyst_target / latest_row['Close']) - 1
+        ) * 100
+    else:
+        target_upside = 0
     # --- QUANT SCORE ---
 
     quant_score = 0
