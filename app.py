@@ -377,11 +377,17 @@ if data is not None:
             f"{forecast_upside:.1f}%"
         )
     with top3:
-        st.metric(            
-            "Analyst Target",
-            f"${analyst_target:.2f}",
-            f"{target_upside:.1f}%"
-        )
+        if analyst_target is not None:
+            st.metric(
+                "Analyst Target",
+                f"${analyst_target:.2f}",
+                f"{target_upside:.1f}%"
+            )
+        else:
+            st.metric(
+                "Analyst Target",
+                "N/A"
+            )
     with top4:
         st.metric(
             "News Sentiment",
