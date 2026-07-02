@@ -3,3 +3,6 @@ yfinance
 pandas
 pandas-ta
 plotly
+prophet
+textblob
+nltk

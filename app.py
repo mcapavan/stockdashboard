@@ -5,6 +5,8 @@ import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import timedelta
+from prophet import Prophet
+from textblob import TextBlob
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Stocks Strategy Dashboard Pro", layout="wide")
@@ -22,7 +24,83 @@ def get_data(ticker):
         
     df.columns = [str(col).strip() for col in df.columns]
     return df
+# Forecast Function
 
+@st.cache_data(ttl=3600)
+def get_forecast(data, days=60):
+
+    forecast_df = data.reset_index()[['Date', 'Close']].copy()
+
+    forecast_df.rename(
+        columns={
+            'Date': 'ds',
+            'Close': 'y'
+        },
+        inplace=True
+    )
+
+    forecast_df['ds'] = pd.to_datetime(
+        forecast_df['ds']
+    ).dt.tz_localize(None)
+
+
+    model = Prophet(
+        daily_seasonality=False,
+        weekly_seasonality=True,
+        yearly_seasonality=True
+    )
+
+    model.fit(forecast_df)
+
+    future = model.make_future_dataframe(periods=days)
+    forecast = model.predict(future)
+
+    return forecast
+# Sentiment Function
+@st.cache_data(ttl=1800)
+def get_sentiment(ticker):
+
+    try:
+        stock = yf.Ticker(ticker)
+
+        news = stock.news
+
+        if not news:
+            return 0, "Neutral"
+
+        sentiments = []
+
+        for article in news[:10]:
+
+            title = ""
+
+            if isinstance(article, dict):
+
+                title = article.get("title", "")
+
+                if not title and "content" in article:
+                    title = article["content"].get(
+                        "title",
+                        ""
+                    )
+
+            polarity = TextBlob(title).sentiment.polarity
+            sentiments.append(polarity)
+
+        avg_sentiment = sum(sentiments) / len(sentiments)
+
+        if avg_sentiment > 0.10:
+            label = "🟢 Bullish"
+        elif avg_sentiment < -0.10:
+            label = "🔴 Bearish"
+        else:
+            label = "🟡 Neutral"
+
+        return avg_sentiment, label
+
+    except:
+        return 0, "Unavailable"
+    
 # Sidebar Title
 st.sidebar.header("🕹️ Strategy Controls")
 
@@ -53,6 +131,11 @@ else:
 
 data = get_data(ticker_symbol)
 
+if len(data) < 60:
+    st.warning(
+        "Not enough historical data for reliable forecasting."
+    )
+
 if data is not None:
     # --- 1. CALCULATE EXCEL INDICATORS ---
     data['EMA_20'] = ta.ema(data['Close'], length=20)
@@ -66,17 +149,12 @@ if data is not None:
     data['Target'] = data['Close'] + (6 * data['ATR_10'])
     
     # --- 2. SIDEBAR SETTINGS & INTERACTIVE RISK-REWARD CALCULATOR ---
+    
     temp_latest = data.iloc[-1]
     current_market_price = float(temp_latest['Close'])
     current_atr = float(temp_latest['ATR_10'])
     
-    st.sidebar.subheader("💼 Portfolio Settings")
-    core_shares = st.sidebar.number_input("Core Shares", value=100)
-    core_basis = st.sidebar.number_input("Cost Basis ($)", value=15.63)
     
-    stop_loss_val = st.sidebar.number_input("Current Stop Loss ($)", value=float(temp_latest['Stop']))
-    target_price_val = st.sidebar.number_input("Current Profit Target ($)", value=float(temp_latest['Target']))
-
     # NEW: INTERACTIVE RISK-REWARD CALCULATOR SECTION
     st.sidebar.markdown("---")
     st.sidebar.subheader("🧮 Interactive Risk-Reward Calculator")
@@ -98,7 +176,7 @@ if data is not None:
         
     rr_ratio = st.sidebar.slider("Target Risk-Reward Ratio (R:R)", 1.0, 5.0, 2.0, 0.5)
     calc_target = calc_entry + (calculated_risk_per_share * rr_ratio)
-    
+
     # Math Calculations
     total_cost = calc_entry * calc_size
     total_risk = calculated_risk_per_share * calc_size
@@ -116,6 +194,15 @@ if data is not None:
         
     st.sidebar.caption(f"Total Capital Exposure: ${total_cost:,.2f}")
     st.sidebar.markdown("---")
+
+    # Sidebar Inputs for Portfolio Settings 
+    st.sidebar.subheader("💼 Portfolio Settings")
+    core_shares = st.sidebar.number_input("Core Shares", value=100)
+    core_basis = st.sidebar.number_input("Cost Basis ($)", value=15.63)
+    
+    stop_loss_val = st.sidebar.number_input("Current Stop Loss ($)", value=float(temp_latest['Stop']))
+    target_price_val = st.sidebar.number_input("Current Profit Target ($)", value=float(temp_latest['Target']))
+
 
     # --- 3. LOGIC ENGINE ---
     def excel_logic_port(row):
@@ -141,6 +228,15 @@ if data is not None:
     data[['Signal', 'Color', 'Reason', 'Conviction']] = pd.DataFrame(res.tolist(), index=data.index)
     latest_row = data.iloc[-1]
 
+    try:
+        forecast = get_forecast(data)
+        future_price = forecast.iloc[-1]['yhat']
+    except Exception as e:
+        forecast = None
+        future_price = latest_row['Close']
+
+    sent_score, sent_label = get_sentiment(ticker_symbol)
+
     # --- 4. UI HEADER ---
     try:
         company_name = yf.Ticker(ticker_symbol).info.get('longName', ticker_symbol)
@@ -153,9 +249,31 @@ if data is not None:
     with c2: 
         st.markdown(f"### Signal: :{latest_row['Color']}[{latest_row['Signal']}]")
         st.caption(f"Reason: {latest_row['Reason']}")
-    with c3:
-        pnl = (latest_row['Close'] - core_basis) * core_shares
-        st.metric("Portfolio P&L", f"${pnl:,.2f}", delta=f"Basis: ${core_basis}")
+    # with c3:
+    #     pnl = (latest_row['Close'] - core_basis) * core_shares
+    #     st.metric("Portfolio P&L", f"${pnl:,.2f}", delta=f"Basis: ${core_basis}")
+
+    f1, f2, f3 = st.columns(3)
+
+    with f1:
+        st.metric(
+            "60-Day Forecast",
+            f"${future_price:.2f}",
+            delta=f"{((future_price/latest_row['Close'])-1)*100:.1f}%"
+        )
+
+    with f2:
+        st.metric(
+            "News Sentiment",
+            sent_label
+        )
+
+    with f3:
+        st.metric(
+            "Sentiment Score",
+            f"{sent_score:.2f}"
+        )
+
 
     # --- 5. COMPACT CHART ---
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=[0.85, 0.15])
@@ -172,6 +290,99 @@ if data is not None:
     fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=550, hovermode="x unified",
                       xaxis=dict(range=[data.index[-90], data.index[-1]]))
     st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("🔮 Price Forecast")
+
+    forecast_fig = go.Figure()
+
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=forecast['ds'],
+            y=forecast['yhat'],
+            name='Forecast',
+            line=dict(color='cyan')
+        )
+    )
+
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=forecast['ds'],
+            y=forecast['yhat_upper'],
+            name='Upper',
+            line=dict(color='green', dash='dot')
+        )
+    )
+
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=forecast['ds'],
+            y=forecast['yhat_lower'],
+            name='Lower',
+            line=dict(color='red', dash='dot')
+        )
+    )
+
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data['Close'],
+            name="Actual Price",
+            line=dict(color="white")
+        )
+    )
+
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=forecast['ds'],
+            y=forecast['yhat_upper'],
+            line=dict(width=0),
+            showlegend=False
+        )
+    )
+
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=forecast['ds'],
+            y=forecast['yhat_lower'],
+            fill='tonexty',
+            fillcolor='rgba(0,255,255,0.15)',
+            line=dict(width=0),
+            name='Confidence Band'
+        )
+    )
+
+    forecast_fig.update_layout(
+        template="plotly_dark",
+        height=450
+    )
+    
+    if forecast is not None:
+    # show chart
+        st.plotly_chart(
+            forecast_fig,
+            use_container_width=True
+        )
+
+    st.subheader("🤖 AI Outlook")
+
+    forecast_return = (
+        (future_price / latest_row['Close']) - 1
+    ) * 100
+
+    if forecast_return > 10 and sent_score > 0:
+        st.success(
+            "Bullish outlook: forecast trend and sentiment align positively."
+        )
+
+    elif forecast_return < -10 and sent_score < 0:
+        st.error(
+            "Bearish outlook: forecast trend and sentiment align negatively."
+        )
+
+    else:
+        st.warning(
+            "Mixed signals: forecast and sentiment are not aligned."
+        )
 
     # --- 6. DATA TABLE ---
     st.subheader("Strategy History (Latest First)")
