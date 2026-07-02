@@ -320,8 +320,8 @@ if data is not None:
     
     previous_signal = data.iloc[-2]["Signal"]
 
-    st.caption(
-        f"Signal ({signal_date_str}): {signal_text}"
+    st.markdown(
+        f"### 📌 Signal ({signal_date_str}): {signal_text}"
     )
     
     # ==================================================
