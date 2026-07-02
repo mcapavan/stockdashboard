@@ -100,7 +100,25 @@ def get_sentiment(ticker):
 
     except:
         return 0, "Unavailable"
-    
+
+@st.cache_data(ttl=3600)
+def get_analyst_target(ticker):
+
+    try:
+
+        stock = yf.Ticker(ticker)
+
+        targets = stock.analyst_price_targets
+
+        if isinstance(targets, dict):
+
+            return targets.get("mean")
+
+        return None
+
+    except:
+        return None
+        
 # Sidebar Title
 st.sidebar.header("🕹️ Strategy Controls")
 
@@ -129,14 +147,24 @@ if selected_name == "-- Enter Manually --":
 else:
     ticker_symbol = ticker_dict[selected_name]
 
+st.sidebar.markdown("---")
+
+forecast_days = st.sidebar.slider(
+    "🔮 Forecast Days",
+    min_value=30,
+    max_value=180,
+    value=60,
+    step=30
+)
+
 data = get_data(ticker_symbol)
 
-if len(data) < 60:
-    st.warning(
-        "Not enough historical data for reliable forecasting."
-    )
-
 if data is not None:
+    if len(data) < 60:
+        st.warning(
+            "Not enough historical data for reliable forecasting."
+        )
+
     # --- 1. CALCULATE EXCEL INDICATORS ---
     data['EMA_20'] = ta.ema(data['Close'], length=20)
     data['ATR_10'] = ta.atr(data['High'], data['Low'], data['Close'], length=10, mamode="sma")
@@ -229,7 +257,11 @@ if data is not None:
     latest_row = data.iloc[-1]
 
     try:
-        forecast = get_forecast(data)
+        # forecast = get_forecast(data)
+        forecast = get_forecast(
+            data,
+            forecast_days
+        )
         future_price = forecast.iloc[-1]['yhat']
     except Exception as e:
         forecast = None
@@ -237,45 +269,200 @@ if data is not None:
 
     sent_score, sent_label = get_sentiment(ticker_symbol)
 
+    analyst_target = get_analyst_target(
+        ticker_symbol
+    )
+
+    forecast_upside = (
+        (future_price / latest_row['Close']) - 1
+    ) * 100
+    
+    target_upside = (
+        (analyst_target / latest_row['Close']) - 1
+    ) * 100
+    # --- QUANT SCORE ---
+
+    quant_score = 0
+
+    if latest_row['Close'] > latest_row['EMA_20']:
+        quant_score += 25
+
+    if latest_row['RSI_14'] > 50:
+        quant_score += 25
+
+    if sent_score > 0:
+        quant_score += 25
+
+    if future_price > latest_row['Close']:
+        quant_score += 25
+
     # --- 4. UI HEADER ---
     try:
         company_name = yf.Ticker(ticker_symbol).info.get('longName', ticker_symbol)
-        st.title(f"📊 {company_name} Strategy Dashboard")
+        st.title(f"📊 {company_name}")
     except:
-        st.title(f"📊 {ticker_symbol} Strategy Dashboard")
+        st.title(f"📊 {ticker_symbol}")
     
-    c1, c2, c3 = st.columns(3)
-    with c1: st.metric("Price", f"${latest_row['Close']:.2f}", delta=f"{latest_row['Price Change']:.2f}%")
-    with c2: 
-        st.markdown(f"### Signal: :{latest_row['Color']}[{latest_row['Signal']}]")
-        st.caption(f"Reason: {latest_row['Reason']}")
-    # with c3:
-    #     pnl = (latest_row['Close'] - core_basis) * core_shares
-    #     st.metric("Portfolio P&L", f"${pnl:,.2f}", delta=f"Basis: ${core_basis}")
+    # ==================================================
+    # EXECUTIVE SUMMARY
+    # ==================================================
 
-    f1, f2, f3 = st.columns(3)
+    bull_points = 0
 
-    with f1:
+    if latest_row['Close'] > latest_row['EMA_20']:
+        bull_points += 1
+
+    if latest_row['RSI_14'] > 50:
+        bull_points += 1
+
+    if sent_score > 0:
+        bull_points += 1
+
+    if future_price > latest_row['Close']:
+        bull_points += 1
+
+    if analyst_target and analyst_target > latest_row['Close']:
+        bull_points += 1
+
+
+    if bull_points >= 4:
+        stance = "🟢 BULLISH"
+
+    elif bull_points >= 3:
+        stance = "🟡 MODERATELY BULLISH"
+
+    elif bull_points == 2:
+        stance = "🟠 NEUTRAL"
+
+    else:
+        stance = "🔴 BEARISH"
+
+
+    bear_case = latest_row['Close'] * 0.85
+    base_case = latest_row['Close'] * 1.10
+    bull_case = latest_row['Close'] * 1.30
+
+    st.markdown("---")
+
+    bull_points = 0
+
+    if latest_row['Close'] > latest_row['EMA_20']:
+        bull_points += 1
+
+    if latest_row['RSI_14'] > 50:
+        bull_points += 1
+
+    if sent_score > 0:
+        bull_points += 1
+
+    if future_price > latest_row['Close']:
+        bull_points += 1
+
+    if analyst_target and analyst_target > latest_row['Close']:
+        bull_points += 1
+
+    if bull_points >= 4:
+        stance = "🟢 BULLISH"
+        stance_color = "green"
+
+    elif bull_points >= 3:
+        stance = "🟡 MODERATELY BULLISH"
+        stance_color = "orange"
+
+    elif bull_points == 2:
+        stance = "🟠 NEUTRAL"
+
+    else:
+        stance = "🔴 BEARISH"
+
+    # Executive Dashboard
+    top1, top2, top3, top4, top5 = st.columns(5)
+
+    with top1:
         st.metric(
-            "60-Day Forecast",
-            f"${future_price:.2f}",
-            delta=f"{((future_price/latest_row['Close'])-1)*100:.1f}%"
+            "Current Price",
+            f"${latest_row['Close']:.2f}",
+            f"{latest_row['Price Change']:.2f}%"
         )
-
-    with f2:
+    with top2:
+        st.metric(
+            "Investment View",
+            stance
+        )
+    with top3:
+        st.metric(
+            "Expected Return",
+            f"{forecast_upside:.1f}%"
+        )
+    with top4:
+        st.metric(
+            "Quant Score",
+            f"{quant_score}/100"
+        )
+    with top5:
         st.metric(
             "News Sentiment",
             sent_label
         )
 
-    with f3:
+    # Scenario Analysis
+    st.markdown("---")
+    st.subheader("🎯 Price Scenarios")
+    s1,s2,s3 = st.columns(3)
+
+    with s1:
         st.metric(
-            "Sentiment Score",
-            f"{sent_score:.2f}"
+            "🐻 Bear Case",
+            f"${bear_case:.2f}",
+            "-15%"
         )
 
+    with s2:
+        st.metric(
+            "⚖️ Base Case",
+            f"${base_case:.2f}",
+            "+10%"
+        )
 
-    # --- 5. COMPACT CHART ---
+    with s3:
+        st.metric(
+            "🚀 Bull Case",
+            f"${bull_case:.2f}",
+            "+30%"
+        )
+
+    # st.info(
+    #     f"""
+    #     🚀 Momentum Buy | Sentiment: {sent_label}
+    #     | Analyst Target: ${analyst_target:.2f}
+    #     | Forecast: ${future_price:.2f}
+    #     """
+    # )
+    # summary1, summary2, summary3, summary4 = st.columns(4)
+
+    # with summary1:
+    #     st.metric(
+    #         "Current Price",
+    #         f"${latest_row['Close']:.2f}",
+    #         f"{latest_row['Price Change']:.2f}%"
+    #     )
+    # with summary2:
+    #     st.metric(
+    #         "Sentiment",
+    #         sent_label.replace("🟢 ","").replace("🟡 ","")
+    #     )
+    # with summary3:
+    #     st.metric(
+    #         "Forecast",
+    #         f"${future_price:.2f}"
+    #     )
+    # with summary4:
+    #     st.metric(
+    #         "Expected Return",
+    #         f"{forecast_upside:.1f}%"
+    #     )
+
+# --- 5. COMPACT CHART ---
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=[0.85, 0.15])
     fig.add_trace(go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'], name="Price"), row=1, col=1)
     fig.add_trace(go.Scatter(x=data.index, y=data['EMA_20'], line=dict(color='orange', width=1.5), name="20-Day EMA"), row=1, col=1)
@@ -289,103 +476,89 @@ if data is not None:
 
     fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=550, hovermode="x unified",
                       xaxis=dict(range=[data.index[-90], data.index[-1]]))
+    
+    # show technical chart
+    st.markdown("---")
+    st.subheader("📈 Technical Analysis")
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("🔮 Price Forecast")
 
-    forecast_fig = go.Figure()
-
-    forecast_fig.add_trace(
-        go.Scatter(
-            x=forecast['ds'],
-            y=forecast['yhat'],
-            name='Forecast',
-            line=dict(color='cyan')
-        )
-    )
-
-    forecast_fig.add_trace(
-        go.Scatter(
-            x=forecast['ds'],
-            y=forecast['yhat_upper'],
-            name='Upper',
-            line=dict(color='green', dash='dot')
-        )
-    )
-
-    forecast_fig.add_trace(
-        go.Scatter(
-            x=forecast['ds'],
-            y=forecast['yhat_lower'],
-            name='Lower',
-            line=dict(color='red', dash='dot')
-        )
-    )
-
-    forecast_fig.add_trace(
-        go.Scatter(
-            x=data.index,
-            y=data['Close'],
-            name="Actual Price",
-            line=dict(color="white")
-        )
-    )
-
-    forecast_fig.add_trace(
-        go.Scatter(
-            x=forecast['ds'],
-            y=forecast['yhat_upper'],
-            line=dict(width=0),
-            showlegend=False
-        )
-    )
-
-    forecast_fig.add_trace(
-        go.Scatter(
-            x=forecast['ds'],
-            y=forecast['yhat_lower'],
-            fill='tonexty',
-            fillcolor='rgba(0,255,255,0.15)',
-            line=dict(width=0),
-            name='Confidence Band'
-        )
-    )
-
-    forecast_fig.update_layout(
-        template="plotly_dark",
-        height=450
-    )
-    
     if forecast is not None:
-    # show chart
+        forecast_fig = go.Figure()
+
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=forecast['ds'],
+                y=forecast['yhat'],
+                name='Forecast',
+                line=dict(color='cyan')
+            )
+        )
+
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=forecast['ds'],
+                y=forecast['yhat_upper'],
+                name='Upper',
+                line=dict(color='green', dash='dot')
+            )
+        )
+
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=forecast['ds'],
+                y=forecast['yhat_lower'],
+                name='Lower',
+                line=dict(color='red', dash='dot')
+            )
+        )
+
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=data.index,
+                y=data['Close'],
+                name="Actual Price",
+                line=dict(color="white")
+            )
+        )
+
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=forecast['ds'],
+                y=forecast['yhat_upper'],
+                line=dict(width=0),
+                showlegend=False
+            )
+        )
+
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=forecast['ds'],
+                y=forecast['yhat_lower'],
+                fill='tonexty',
+                fillcolor='rgba(0,255,255,0.15)',
+                line=dict(width=0),
+                name='Confidence Band'
+            )
+        )
+
+        forecast_fig.update_layout(
+            template="plotly_dark",
+            height=450
+        )
+        # show forecast chart
+        st.markdown("---")
+        st.subheader("🔮 Forecast Analysis")
         st.plotly_chart(
             forecast_fig,
             use_container_width=True
         )
 
-    st.subheader("🤖 AI Outlook")
-
-    forecast_return = (
-        (future_price / latest_row['Close']) - 1
-    ) * 100
-
-    if forecast_return > 10 and sent_score > 0:
-        st.success(
-            "Bullish outlook: forecast trend and sentiment align positively."
-        )
-
-    elif forecast_return < -10 and sent_score < 0:
-        st.error(
-            "Bearish outlook: forecast trend and sentiment align negatively."
-        )
-
-    else:
-        st.warning(
-            "Mixed signals: forecast and sentiment are not aligned."
-        )
-
     # --- 6. DATA TABLE ---
-    st.subheader("Strategy History (Latest First)")
+    # show Data Table with Conditional Formatting 
+    st.markdown("---")
+    st.subheader("📚 Historical Data")
+    st.caption("Strategy History (Latest First)")
     df_disp = data.reset_index()
     df_disp['Date'] = df_disp['Date'].dt.strftime('%Y-%m-%d')
     df_disp = df_disp.sort_values(by='Date', ascending=False)
