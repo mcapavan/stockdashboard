@@ -123,7 +123,8 @@ def get_analyst_target(ticker):
 def get_currency_symbol(ticker):
     try:
         info = yf.Ticker(ticker).info
-        currency = info.get('currency', 'USD')
+        # currency = info.get('currency', 'USD')
+        currency = info.get('currency') or 'USD'
     except:
         currency = 'USD'
 
