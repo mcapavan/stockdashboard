@@ -247,9 +247,9 @@ if data is not None:
     st.sidebar.markdown("---")
 
     # Sidebar Inputs for Portfolio Settings 
-    st.sidebar.subheader("💼 Portfolio Settings")
-    core_shares = st.sidebar.number_input("Core Shares", value=100)
-    core_basis = st.sidebar.number_input(f"Cost Basis ({currency_symbol})", value=15.63)
+    st.sidebar.subheader("🎯 Stop / Target Levels")
+    # core_shares = st.sidebar.number_input("Core Shares", value=100)
+    # core_basis = st.sidebar.number_input(f"Cost Basis ({currency_symbol})", value=15.63)
     
     stop_loss_val = st.sidebar.number_input(f"Current Stop Loss ({currency_symbol})", value=float(temp_latest['Stop']))
     target_price_val = st.sidebar.number_input(f"Current Profit Target ({currency_symbol})", value=float(temp_latest['Target']))
