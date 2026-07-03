@@ -374,7 +374,7 @@ if data is not None:
         st.metric(
             "Forecast Target",
             f"${future_price:.2f}",
-            f"{forecast_upside:.1f}%"
+            f"{forecast_upside:.1f}% ({forecast_days} Days)"
         )
     with top3:
         if analyst_target is not None:
