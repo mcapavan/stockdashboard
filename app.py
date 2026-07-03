@@ -144,6 +144,10 @@ selected_name = st.sidebar.selectbox(
 
 if selected_name == "-- Enter Manually --":
     ticker_symbol = st.sidebar.text_input("Enter Stock Ticker", value="RIVN").upper()
+
+    st.sidebar.caption(
+        "🇺🇸 US: RIVN, TSLA, NVDA  |  🇮🇳 India: INFY.NS, TCS.NS, RELIANCE.NS"
+    )
 else:
     ticker_symbol = ticker_dict[selected_name]
 
