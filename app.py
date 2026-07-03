@@ -118,6 +118,23 @@ def get_analyst_target(ticker):
 
     except:
         return None
+
+@st.cache_data(ttl=3600)
+def get_currency_symbol(ticker):
+    try:
+        info = yf.Ticker(ticker).info
+        currency = info.get('currency', 'USD')
+    except:
+        currency = 'USD'
+
+    symbol_map = {
+        'USD': '$',
+        'INR': '₹',
+        'EUR': '€',
+        'GBP': '£',
+        'JPY': '¥',
+    }
+    return symbol_map.get(currency, currency + ' ')
         
 # Sidebar Title
 st.sidebar.header("🕹️ Strategy Controls")
@@ -162,6 +179,7 @@ forecast_days = st.sidebar.slider(
 )
 
 data = get_data(ticker_symbol)
+currency_symbol = get_currency_symbol(ticker_symbol)
 
 if data is not None:
     if len(data) < 60:
@@ -191,7 +209,7 @@ if data is not None:
     st.sidebar.markdown("---")
     st.sidebar.subheader("🧮 Interactive Risk-Reward Calculator")
     
-    calc_entry = st.sidebar.number_input("Hypothetical Entry Price ($)", value=round(current_market_price, 2), step=0.1)
+    calc_entry = st.sidebar.number_input(f"Hypothetical Entry Price ({currency_symbol})", value=round(current_market_price, 2), step=0.1)
     calc_size = st.sidebar.number_input("Position Size (Shares)", value=100, step=10)
     
     # Let users choose risk definition (Multiplier of ATR vs Manual Percent)
@@ -216,24 +234,24 @@ if data is not None:
     
     # Display Calculator Results directly in sidebar with styling
     st.sidebar.markdown("**Calculator Output:**")
-    st.sidebar.info(f"🛑 **Suggested Stop:** ${calc_stop:.2f}\n\n🎯 **Suggested Target:** ${calc_target:.2f}")
+    st.sidebar.info(f"🛑 **Suggested Stop:** {currency_symbol}{calc_stop:.2f}\n\n🎯 **Suggested Target:** {currency_symbol}{calc_target:.2f}")
     
     col_c1, col_c2 = st.sidebar.columns(2)
     with col_c1:
-        st.metric("Total Risk", f"${total_risk:.2f}", delta_color="inverse")
+        st.metric("Total Risk", f"{currency_symbol}{total_risk:.2f}", delta_color="inverse")
     with col_c2:
-        st.metric("Total Reward", f"${total_reward:.2f}")
+        st.metric("Total Reward", f"{currency_symbol}{total_reward:.2f}")
         
-    st.sidebar.caption(f"Total Capital Exposure: ${total_cost:,.2f}")
+    st.sidebar.caption(f"Total Capital Exposure: {currency_symbol}{total_cost:,.2f}")
     st.sidebar.markdown("---")
 
     # Sidebar Inputs for Portfolio Settings 
     st.sidebar.subheader("💼 Portfolio Settings")
     core_shares = st.sidebar.number_input("Core Shares", value=100)
-    core_basis = st.sidebar.number_input("Cost Basis ($)", value=15.63)
+    core_basis = st.sidebar.number_input(f"Cost Basis ({currency_symbol})", value=15.63)
     
-    stop_loss_val = st.sidebar.number_input("Current Stop Loss ($)", value=float(temp_latest['Stop']))
-    target_price_val = st.sidebar.number_input("Current Profit Target ($)", value=float(temp_latest['Target']))
+    stop_loss_val = st.sidebar.number_input(f"Current Stop Loss ({currency_symbol})", value=float(temp_latest['Stop']))
+    target_price_val = st.sidebar.number_input(f"Current Profit Target ({currency_symbol})", value=float(temp_latest['Target']))
 
 
     # --- 3. LOGIC ENGINE ---
@@ -370,21 +388,21 @@ if data is not None:
     with top1:
         st.metric(
             "Current Price",
-            f"${latest_row['Close']:.2f}",
+            f"{currency_symbol}{latest_row['Close']:.2f}",
             f"{latest_row['Price Change']:.2f}%"
         )
    
     with top2:
         st.metric(
             "Forecast Target",
-            f"${future_price:.2f}",
+            f"{currency_symbol}{future_price:.2f}",
             f"{forecast_upside:.1f}% ({forecast_days} Days)"
         )
     with top3:
         if analyst_target is not None:
             st.metric(
                 "Analyst Target",
-                f"${analyst_target:.2f}",
+                f"{currency_symbol}{analyst_target:.2f}",
                 f"{target_upside:.1f}%"
             )
         else:
