@@ -5,6 +5,7 @@ import numpy as np
 import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import time
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Stocks Strategy Dashboard Pro", layout="wide")
@@ -24,29 +25,45 @@ def record_warning(source, ticker, err):
 
 @st.cache_data(ttl=3600)
 def get_data(ticker, period="2y"):
-    """Pull daily OHLCV and forcefully flattens multi-index structures."""
-    df = yf.download(ticker, period=period, interval="1d", auto_adjust=True)
-    if df.empty:
-        return None
-        
-    df = df.copy()
-    
-    # Forcefully strip MultiIndex column configurations
-    if isinstance(df.columns, pd.MultiIndex):
+    """Pull daily OHLCV. Retries a few times before giving up.
+
+    Why the retry matters: Yahoo Finance / yfinance occasionally fails
+    on the very first request from a freshly-started process (cold-start
+    session/rate-limit hiccup - common on cloud hosts). Without a retry,
+    that one blip gets cached by @st.cache_data as a permanent `None`
+    for the full ttl, since Streamlit caches whatever the function
+    returns - including a failure. That's the likely reason the
+    DEFAULT ticker (loaded automatically on boot, so it's the one most
+    exposed to a cold-start blip) can fail while every other ticker
+    (fetched later, after the app has warmed up) works fine.
+    """
+    df, last_error = None, None
+    for attempt in range(3):
         try:
-            # Flatten multi-index tuple formats like ('Close', 'RIVN') to just 'Close'
-            df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
-        except Exception:
-            df.columns = df.columns.get_level_values(0)
-            
-    # Normalize strings to standard lowercase-to-capitalized format
-    df.columns = [str(col).strip().capitalize() for col in df.columns]
-    
-    # Ensure mandatory baseline data columns are mapped explicitly
+            df = yf.download(ticker, period=period, interval="1d", auto_adjust=True, progress=False)
+            if df is not None and not df.empty:
+                break
+        except Exception as e:
+            last_error = e
+        time.sleep(1.5 * (attempt + 1))
+
+    if df is None or df.empty:
+        record_warning("get_data", ticker, last_error or "empty response after 3 attempts")
+        return None
+
+    df = df.copy()
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df.columns = [str(col).strip() for col in df.columns]
+
+    # Defensive check: if Yahoo ever returns a malformed/partial
+    # response, fail cleanly here rather than crashing deeper in the
+    # indicator pipeline.
     required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     if not all(col in df.columns for col in required_cols):
+        record_warning("get_data", ticker, f"missing expected columns: got {list(df.columns)}")
         return None
-        
+
     return df
 
 
@@ -130,6 +147,12 @@ def compute_latest_snapshot(ticker, rsi_low, rsi_high, vol_confirm_mult,
 # =====================================================================
 
 st.sidebar.header("🕹️ Strategy Controls")
+
+if st.sidebar.button("🔄 Clear cache & retry data fetch"):
+    get_data.clear()
+    get_analyst_target.clear()
+    get_currency_symbol.clear()
+    st.rerun()
 
 ticker_dict = {
     "Rivian Automotive (RIVN)": "RIVN",
