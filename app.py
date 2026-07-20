@@ -24,15 +24,29 @@ def record_warning(source, ticker, err):
 
 @st.cache_data(ttl=3600)
 def get_data(ticker, period="2y"):
-    """Pull daily OHLCV. 2y default so rolling stats (esp. Vol_Avg_30,
-    ATR_10) have real history behind them, and so any future seasonal
-    analysis isn't fit on a single cycle."""
+    """Pull daily OHLCV and forcefully flattens multi-index structures."""
     df = yf.download(ticker, period=period, interval="1d", auto_adjust=True)
     if df.empty:
         return None
+        
+    df = df.copy()
+    
+    # Forcefully strip MultiIndex column configurations
     if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(col).strip() for col in df.columns]
+        try:
+            # Flatten multi-index tuple formats like ('Close', 'RIVN') to just 'Close'
+            df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+        except Exception:
+            df.columns = df.columns.get_level_values(0)
+            
+    # Normalize strings to standard lowercase-to-capitalized format
+    df.columns = [str(col).strip().capitalize() for col in df.columns]
+    
+    # Ensure mandatory baseline data columns are mapped explicitly
+    required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+    if not all(col in df.columns for col in required_cols):
+        return None
+        
     return df
 
 
