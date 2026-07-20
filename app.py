@@ -207,10 +207,19 @@ PORTFOLIO_TIERS = {
 tier_options = list(PORTFOLIO_TIERS.keys()) + ["-- Enter Manually --"]
 default_tier_index = tier_options.index("Other / Watchlist")
 
+# If a Portfolio Scan row was clicked on the previous run, apply that
+# navigation request BEFORE creating the widgets below, so this run
+# opens directly on the clicked ticker.
+if "pending_jump_tier" in st.session_state:
+    st.session_state["tier_select"] = st.session_state.pop("pending_jump_tier")
+if "pending_jump_stock" in st.session_state:
+    st.session_state["stock_select"] = st.session_state.pop("pending_jump_stock")
+
 tier_choice = st.sidebar.selectbox(
     "Portfolio Tier",
     options=tier_options,
     index=default_tier_index,
+    key="tier_select",
 )
 
 if tier_choice == "-- Enter Manually --":
@@ -223,7 +232,9 @@ else:
         stock_names.index("Rivian Automotive (RIVN)")
         if "Rivian Automotive (RIVN)" in stock_names else 0
     )
-    selected_name = st.sidebar.selectbox("Select Stock", options=stock_names, index=default_stock_index)
+    selected_name = st.sidebar.selectbox(
+        "Select Stock", options=stock_names, index=default_stock_index, key="stock_select"
+    )
     ticker_symbol = tier_stocks[selected_name]
 
 st.sidebar.markdown("---")
@@ -253,8 +264,12 @@ run_scan = st.button("🔍 Run Portfolio Scan")
 
 if run_scan:
     all_portfolio_stocks = {}
+    ticker_lookup = {}  # ticker -> (tier_name, display_name), used for click-to-navigate
     for tier_name in ["Tier 1: Core Compounders", "Tier 2: Structural Growth", "Tier 3: Higher-Risk / Upside"]:
-        all_portfolio_stocks.update(PORTFOLIO_TIERS[tier_name])
+        for name, tkr in PORTFOLIO_TIERS[tier_name].items():
+            all_portfolio_stocks[name] = tkr
+            ticker_lookup[tkr] = (tier_name, name)
+    st.session_state["scan_ticker_lookup"] = ticker_lookup
 
     scan_rows = []
     progress = st.progress(0.0, text="Scanning tickers...")
@@ -271,8 +286,9 @@ if run_scan:
     progress.empty()
 
     if scan_rows:
-        scan_df = pd.DataFrame(scan_rows).sort_values("Conviction", ascending=False)
+        scan_df = pd.DataFrame(scan_rows).sort_values("Conviction", ascending=False).reset_index(drop=True)
         scan_df = scan_df[["Name", "Ticker", "Price", "Chg %", "RSI", "Signal", "Conviction", "Stop", "Target"]]
+        st.session_state["scan_df_cache"] = scan_df  # so a click survives the rerun below
 
         n_value = (scan_df['Signal'] == "💎 VALUE BUY").sum()
         n_momentum = (scan_df['Signal'] == "🚀 MOMENTUM BUY").sum()
@@ -280,23 +296,48 @@ if run_scan:
             st.success(f"💎 {n_value} Value Buy · 🚀 {n_momentum} Momentum Buy flagged today.")
         else:
             st.info("No BUY signals across the portfolio today.")
-
-        def scan_row_styler(row):
-            if "VALUE" in str(row.Signal):
-                return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
-            if "MOMENTUM" in str(row.Signal):
-                return ['background-color: rgba(52, 152, 219, 0.2)'] * len(row)
-            return [''] * len(row)
-
-        st.dataframe(
-            scan_df.style.apply(scan_row_styler, axis=1).format({
-                'Price': '{:.2f}', 'Chg %': '{:+.2f}%', 'RSI': '{:.1f}',
-                'Stop': '{:.2f}', 'Target': '{:.2f}',
-            }),
-            use_container_width=True, hide_index=True
-        )
     else:
         st.warning("No data returned for any portfolio ticker - check network/ticker validity.")
+
+# Render from cache (not just inside `if run_scan`) so the table and its
+# click-to-navigate behaviour survive the rerun triggered by a row click.
+if "scan_df_cache" in st.session_state:
+    scan_df = st.session_state["scan_df_cache"]
+    ticker_lookup = st.session_state.get("scan_ticker_lookup", {})
+
+    def scan_row_styler(row):
+        if "VALUE" in str(row.Signal):
+            return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
+        if "MOMENTUM" in str(row.Signal):
+            return ['background-color: rgba(52, 152, 219, 0.2)'] * len(row)
+        return [''] * len(row)
+
+    st.caption("👉 Click any row to jump straight to that ticker's full analysis below.")
+    scan_event = st.dataframe(
+        scan_df.style.apply(scan_row_styler, axis=1).format({
+            'Price': '{:.2f}', 'Chg %': '{:+.2f}%', 'RSI': '{:.1f}',
+            'Stop': '{:.2f}', 'Target': '{:.2f}',
+        }),
+        use_container_width=True, hide_index=True,
+        on_select="rerun", selection_mode="single-row", key="scan_table_select",
+    )
+
+    selected_rows = []
+    if scan_event and hasattr(scan_event, "selection"):
+        selected_rows = scan_event.selection.get("rows", [])
+    elif isinstance(scan_event, dict):
+        selected_rows = scan_event.get("selection", {}).get("rows", [])
+
+    if selected_rows:
+        clicked_ticker = scan_df.iloc[selected_rows[0]]["Ticker"]
+        if clicked_ticker in ticker_lookup:
+            jump_tier, jump_name = ticker_lookup[clicked_ticker]
+            # Only trigger a jump if this isn't already the selected ticker
+            # (avoids an infinite rerun loop once the click has been applied).
+            if st.session_state.get("tier_select") != jump_tier or st.session_state.get("stock_select") != jump_name:
+                st.session_state["pending_jump_tier"] = jump_tier
+                st.session_state["pending_jump_stock"] = jump_name
+                st.rerun()
 
 st.markdown("---")
 
