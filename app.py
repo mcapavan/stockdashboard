@@ -305,6 +305,13 @@ if "scan_df_cache" in st.session_state:
     scan_df = st.session_state["scan_df_cache"]
     ticker_lookup = st.session_state.get("scan_ticker_lookup", {})
 
+    # A row selection made on a previous run to trigger navigation needs
+    # to be cleared here, BEFORE the widget is recreated - otherwise the
+    # checkbox stays ticked forever and fights any later manual change
+    # to the "Select Stock" dropdown.
+    if st.session_state.pop("clear_scan_selection", False):
+        st.session_state["scan_table_select"] = {"selection": {"rows": [], "columns": []}}
+
     def scan_row_styler(row):
         if "VALUE" in str(row.Signal):
             return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
@@ -337,7 +344,12 @@ if "scan_df_cache" in st.session_state:
             if st.session_state.get("tier_select") != jump_tier or st.session_state.get("stock_select") != jump_name:
                 st.session_state["pending_jump_tier"] = jump_tier
                 st.session_state["pending_jump_stock"] = jump_name
+                # Schedule the checkbox to be cleared on the very next run,
+                # once it's done its job of triggering this navigation.
+                st.session_state["clear_scan_selection"] = True
                 st.rerun()
+
+
 
 st.markdown("---")
 
