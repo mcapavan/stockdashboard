@@ -6,6 +6,7 @@ import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import time
+from datetime import datetime
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Stocks Strategy Dashboard Pro", layout="wide")
@@ -148,133 +149,37 @@ def compute_latest_snapshot(ticker, rsi_low, rsi_high, vol_confirm_mult,
 
 st.sidebar.header("🕹️ Strategy Controls")
 
-if st.sidebar.button("🔄 Clear cache & retry data fetch"):
-    get_data.clear()
-    get_analyst_target.clear()
-    get_currency_symbol.clear()
-    st.rerun()
+@st.cache_data(ttl=300)
+def load_portfolio_tiers(csv_path="tickers.csv"):
+    """Loads the ticker universe from a CSV sitting alongside app.py, so
+    adding/removing/editing tickers or whole tiers is just an edit to that
+    file - no code changes needed. Expected columns: Market (US/India),
+    Tier (plain label, e.g. 'Tier 1: Core Compounders' or
+    'Other / Watchlist'), Name (display label), Ticker (yfinance symbol,
+    include .NS for India). Cached for 5 minutes so local edits during
+    development show up without a full app restart.
+    """
+    try:
+        df = pd.read_csv(csv_path)
+    except FileNotFoundError:
+        st.error(
+            f"Could not find `{csv_path}`. Make sure tickers.csv is committed "
+            "in the same folder as app.py."
+        )
+        return {}
 
-ticker_dict = {
-    "Rivian Automotive (RIVN)": "RIVN",
-    "Nio Inc. (NIO)": "NIO",
-    "XPeng Inc. (XPEV)": "XPEV",
-    "Tesla, Inc. (TSLA)": "TSLA",
-    "Apple Inc. (AAPL)": "AAPL",
-    "Microsoft Corp (MSFT)": "MSFT",
-    "Alphabet Inc (GOOGL)": "GOOGL",
-    "Amazon.com Inc (AMZN)": "AMZN",
-    "NVIDIA Corp (NVDA)": "NVDA",
-    "Intel Corp (INTC)": "INTC",
-}
+    tiers = {}
+    for _, row in df.iterrows():
+        market = str(row["Market"]).strip()
+        flag = "🇺🇸 US " if market.upper() == "US" else "🇮🇳 India "
+        key = f"{flag}{str(row['Tier']).strip()}"
+        tiers.setdefault(key, {})[str(row["Name"]).strip()] = str(row["Ticker"]).strip()
+    return tiers
 
-# Pension sleeve tiers - grouped so you can browse straight to the
-# tier you're checking rather than hunting for a ticker in one long list.
-# US tiers listed first, India tiers after - keeps the two markets
-# visually separated in the dropdown via the flag prefix.
-PORTFOLIO_TIERS = {
-    "🇺🇸 US Tier 1: Core Compounders": {
-        "Walmart (WMT)": "WMT",
-        "Eli Lilly (LLY)": "LLY",
-        "GE Aerospace (GE)": "GE",
-        "AbbVie (ABBV)": "ABBV",
-        "Honeywell (HON)": "HON",
-        "Vertex Pharmaceuticals (VRTX)": "VRTX",
-        "ASML Holding (ASML)": "ASML",
-        "Eaton Corp (ETN)": "ETN",
-        "Constellation Energy (CEG)": "CEG",
-        "MercadoLibre (MELI)": "MELI",
-    },
-    "🇺🇸 US Tier 2: Structural Growth": {
-        "Arista Networks (ANET)": "ANET",
-        "Palo Alto Networks (PANW)": "PANW",
-        "KLA Corp (KLAC)": "KLAC",
-        "Applied Materials (AMAT)": "AMAT",
-        "Marvell Technology (MRVL)": "MRVL",
-        "Qualcomm (QCOM)": "QCOM",
-        "CrowdStrike (CRWD)": "CRWD",
-        "Vertiv Holdings (VRT)": "VRT",
-        "Palantir Technologies (PLTR)": "PLTR",
-        "GE Vernova (GEV)": "GEV",
-    },
-    "🇺🇸 US Tier 3: Higher-Risk / Upside": {
-        "Arm Holdings (ARM)": "ARM",
-        "AppLovin (APP)": "APP",
-        "AST SpaceMobile (ASTS)": "ASTS",
-        "TransMedics Group (TMDX)": "TMDX",
-        "CRISPR Therapeutics (CRSP)": "CRSP",
-    },
-    "🇺🇸 US Other / Watchlist": ticker_dict,
-    "🇮🇳 India Tier 1: Core Compounders": {
-        "Multi Commodity Exchange (MCX)": "MCX.NS",
-        "HDFC Bank (HDFCBANK)": "HDFCBANK.NS",
-        "Larsen & Toubro (LT)": "LT.NS",
-        "Kotak Mahindra Bank (KOTAKBANK)": "KOTAKBANK.NS",
-        "Tata Consultancy Services (TCS)": "TCS.NS",
-        "Asian Paints (ASIANPAINT)": "ASIANPAINT.NS",
-        "Bajaj Auto (BAJAJ-AUTO)": "BAJAJ-AUTO.NS",
-        "Maruti Suzuki (MARUTI)": "MARUTI.NS",
-        "HDFC Asset Management (HDFCAMC)": "HDFCAMC.NS",
-        "Infosys (INFY)": "INFY.NS",
-    },
-    "🇮🇳 India Tier 2: Structural Growth": {
-        "CRISIL (CRISIL)": "CRISIL.NS",
-        "Zydus Lifesciences (ZYDUSLIFE)": "ZYDUSLIFE.NS",
-        "Supriya Lifescience (SUPRIYA)": "SUPRIYA.NS",
-        "Coforge (COFORGE)": "COFORGE.NS",
-        "Dixon Technologies (DIXON)": "DIXON.NS",
-        "Marksans Pharma (MARKSANS)": "MARKSANS.NS",
-        "Eicher Motors (EICHERMOT)": "EICHERMOT.NS",
-        "Narayana Hrudayalaya (NH)": "NH.NS",
-    },
-    "🇮🇳 India Tier 3: Tactical / Cyclical": {
-        "Federal Bank (FEDERALBNK)": "FEDERALBNK.NS",
-        "Ashiana Housing (ASHIANA)": "ASHIANA.NS",
-        "Pricol Limited (PRICOLLTD)": "PRICOLLTD.NS",
-        "Lupin (LUPIN)": "LUPIN.NS",
-        "Hero MotoCorp (HEROMOTOCO)": "HEROMOTOCO.NS",
-        "VST Tillers Tractors (VSTTILLERS)": "VSTTILLERS.NS",
-    },
-    "🇮🇳 India Tier 4: VRS New Recommendations": {
-        "Tinna Rubber & Infrastructure (TINNARUBR)": "TINNARUBR.NS",
-        "Pitti Engineering (PITTIENG)": "PITTIENG.NS",
-        "Styrenix Performance Materials (STYRENIX)": "STYRENIX.NS",
-        "Aurionpro Solutions (AURIONPRO)": "AURIONPRO.NS",
-        "Fineotex Chemical (FCL)": "FCL.NS",
-    },
-    "🇮🇳 India Tier 5: Green Energy": {
-        "TDPOWERSYS": "TDPOWERSYS.NS",
-        "VISL": "VISL.NS",
-        "SYRMA": "SYRMA.NS",
-        "EBGNG": "EBGNG.NS",
-        "ATHERENERG": "ATHERENERG.NS",
-        "SANSERA": "SANSERA.NS",
-        "VOGL": "VOGL.NS",
-        "AVALON": "AVALON.NS",
-        "FIEMIND": "FIEMIND.NS",
-        "EMMVEE": "EMMVEE.NS",
-        "QPOWER": "QPOWER.NS",
-        "POCL": "POCL.NS",
-        "SBCL": "SBCL.NS",
-        "NEOGEN": "NEOGEN.NS",
-        "SKIPPER": "SKIPPER.NS",
-        "INOXINDIA": "INOXINDIA.NS",
-        "ENRIN": "ENRIN.NS",
-        "VAML": "VAML.NS",
-        "THERMAX": "THERMAX.NS",
-        "BORORENEW": "BORORENEW.NS",
-        "HBLENGINE": "HBLENGINE.NS",
-        "WAAREEENER": "WAAREEENER.NS",
-        "TRITURBINE": "TRITURBINE.NS",
-        "LIQUIDCASE": "LIQUIDCASE.NS",
-        "JASH": "JASH.NS",
-        "VEDL": "VEDL.NS",
-        "GANECOS": "GANECOS.NS",
-        "POWERMECH": "POWERMECH.NS",
-        "JAINREC": "JAINREC.NS",
-    },
-}
 
-tier_options = list(PORTFOLIO_TIERS.keys()) + ["-- Enter Manually --"]
+PORTFOLIO_TIERS = load_portfolio_tiers()
+
+tier_options = ["-- Enter Manually --"] + list(PORTFOLIO_TIERS.keys())
 default_tier_index = tier_options.index("🇺🇸 US Other / Watchlist")
 
 # If a Portfolio Scan row was clicked on the previous run, apply that
@@ -329,6 +234,14 @@ atr_target_mult = st.sidebar.slider("Target: ATR multiplier", 2.0, 10.0, 6.0, 0.
 
 st.sidebar.markdown("---")
 
+if st.sidebar.button("🔄 Clear cache & retry data fetch"):
+    get_data.clear()
+    get_analyst_target.clear()
+    get_currency_symbol.clear()
+    st.rerun()
+
+st.sidebar.markdown("---")
+
 def scan_row_styler(row):
     if "VALUE" in str(row.Signal):
         return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
@@ -348,36 +261,43 @@ def render_portfolio_scan(section_id, section_title, button_label, tier_names):
     table_widget_key = f"scan_table_select_{section_id}"
     clear_flag_key = f"clear_scan_selection_{section_id}"
 
+    total_tickers = sum(len(PORTFOLIO_TIERS.get(t, {})) for t in tier_names)
+    last_scan = st.session_state.get(f"last_scan_time_{section_id}", "not run yet")
+
     st.subheader(section_title)
+    st.caption(f"📦 {total_tickers} tickers tracked · 🕒 Last scan: {last_scan}")
     run_scan = st.button(button_label, key=f"run_scan_btn_{section_id}")
 
     if run_scan:
         st.session_state[expanded_key] = True
+        st.session_state[f"last_scan_time_{section_id}"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         all_stocks = {}
         ticker_lookup = {}  # ticker -> (tier_name, display_name), for click-to-navigate
         for tier_name in tier_names:
+            short_tier = tier_name.replace("🇺🇸 US ", "").replace("🇮🇳 India ", "")
             for name, tkr in PORTFOLIO_TIERS[tier_name].items():
-                all_stocks[name] = tkr
+                all_stocks[name] = (tkr, short_tier)
                 ticker_lookup[tkr] = (tier_name, name)
         st.session_state[lookup_key] = ticker_lookup
 
         scan_rows = []
         progress = st.progress(0.0, text="Scanning tickers...")
         tickers_list = list(all_stocks.items())
-        for i, (name, tkr) in enumerate(tickers_list):
+        for i, (name, (tkr, short_tier)) in enumerate(tickers_list):
             snap = compute_latest_snapshot(
                 tkr, rsi_low, rsi_high, vol_confirm_mult,
                 momentum_vol_mult, momentum_rsi_cap, atr_stop_mult, atr_target_mult
             )
             if snap:
                 snap["Name"] = name
+                snap["Tier"] = short_tier
                 scan_rows.append(snap)
             progress.progress((i + 1) / len(tickers_list), text=f"Scanning tickers... ({tkr})")
         progress.empty()
 
         if scan_rows:
             scan_df = pd.DataFrame(scan_rows).sort_values("Conviction", ascending=False).reset_index(drop=True)
-            scan_df = scan_df[["Name", "Ticker", "Price", "Chg %", "RSI", "Signal", "Conviction", "Stop", "Target"]]
+            scan_df = scan_df[["Name", "Tier", "Ticker", "Price", "Chg %", "RSI", "Signal", "Conviction", "Stop", "Target"]]
             st.session_state[cache_key] = scan_df
 
             n_value = (scan_df['Signal'] == "💎 VALUE BUY").sum()
@@ -404,12 +324,13 @@ def render_portfolio_scan(section_id, section_title, button_label, tier_names):
 
         with st.expander("📋 Scan Results", expanded=st.session_state.get(expanded_key, True)):
             st.caption("👉 Click any row to jump straight to that ticker's full analysis below.")
+            display_cols = [c for c in scan_df.columns if c != "Ticker"]
             scan_event = st.dataframe(
                 scan_df.style.apply(scan_row_styler, axis=1).format({
                     'Price': '{:.2f}', 'Chg %': '{:+.2f}%', 'RSI': '{:.1f}',
                     'Stop': '{:.2f}', 'Target': '{:.2f}',
                 }),
-                use_container_width=True, hide_index=True,
+                use_container_width=True, hide_index=True, column_order=display_cols,
                 on_select="rerun", selection_mode="single-row", key=table_widget_key,
             )
 
@@ -435,12 +356,23 @@ def render_portfolio_scan(section_id, section_title, button_label, tier_names):
 
 
 # =====================================================================
+# APP HEADER
+# =====================================================================
+st.title("📊 Pension Portfolio Strategy Dashboard")
+st.caption(
+    "DCA / scale-in signal scanning across your US and India tiers, plus a full "
+    "single-stock deep dive with backtesting and risk-level tracking."
+)
+st.markdown("---")
+
+# =====================================================================
 # PORTFOLIO SCAN - US and India run as two fully independent sections
 # =====================================================================
+st.header("🔍 Portfolio Scans")
 st.caption(
     "Today's signal across your portfolio, using the same thresholds set in the "
     "sidebar. Use this to see which names are flashing a signal before drilling "
-    "into any single ticker below."
+    "into any single ticker below - click any result row to jump straight there."
 )
 
 render_portfolio_scan(
@@ -464,6 +396,8 @@ render_portfolio_scan(
 )
 
 st.markdown("---")
+st.header("📌 Single Stock Deep Dive")
+st.caption("Full signal history, chart, backtest, and tranche tracking for the ticker selected in the sidebar.")
 
 data = get_data(ticker_symbol)
 currency_symbol = get_currency_symbol(ticker_symbol)
@@ -667,15 +601,6 @@ if data is not None and len(data) >= 60:
 
     tranche_df = pd.DataFrame(tranche_records).sort_values("Entry Date", ascending=False) if tranche_records else pd.DataFrame()
 
-    if not tranche_df.empty:
-        n_stopped = (tranche_df['Outcome'] == "🔴 Stopped Out").sum()
-        n_target = (tranche_df['Outcome'] == "🔵 Target Hit").sum()
-        n_open = (tranche_df['Outcome'] == "Still Open").sum()
-        st.info(
-            f"📋 Of {len(tranche_df)} past BUY signals: **{n_target} hit their target**, "
-            f"**{n_stopped} hit their stop**, **{n_open} are still open** (neither level reached yet)."
-        )
-
     latest_row = data.iloc[-1]
     signal_date = data.index[-2]
     signal_text = data.iloc[-2]["Signal"]
@@ -743,10 +668,10 @@ if data is not None and len(data) >= 60:
     # =================================================================
     try:
         company_name = yf.Ticker(ticker_symbol).info.get('longName', ticker_symbol)
-        st.title(f"📊 {company_name}")
+        st.subheader(f"📊 {company_name} ({ticker_symbol})")
     except Exception as e:
         record_warning("company_name_lookup", ticker_symbol, e)
-        st.title(f"📊 {ticker_symbol}")
+        st.subheader(f"📊 {ticker_symbol}")
 
     if DATA_WARNINGS:
         with st.expander(f"⚠️ {len(DATA_WARNINGS)} data fetch warning(s) - click to view"):
@@ -841,16 +766,25 @@ if data is not None and len(data) >= 60:
     # =================================================================
     # 6a. TRANCHE OUTCOMES - per-signal stop/target result (the "exit" view)
     # =================================================================
-    st.subheader("🎯 Tranche Outcomes")
-    st.caption(
-        "What happened after each past BUY signal - did that tranche's own stop or "
-        "target get hit, or is it still open. Independent per signal; does not affect "
-        "future signals."
-    )
     if not tranche_df.empty:
-        st.dataframe(tranche_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("No BUY signals yet in this window to evaluate.")
+        n_stopped = (tranche_df['Outcome'] == "🔴 Stopped Out").sum()
+        n_target = (tranche_df['Outcome'] == "🔵 Target Hit").sum()
+        n_open = (tranche_df['Outcome'] == "Still Open").sum()
+        st.info(
+            f"📋 Of {len(tranche_df)} past BUY signals: **{n_target} hit their target**, "
+            f"**{n_stopped} hit their stop**, **{n_open} are still open** (neither level reached yet)."
+        )
+
+    with st.expander("🎯 Tranche Outcomes", expanded=False):
+        st.caption(
+            "What happened after each past BUY signal - did that tranche's own stop or "
+            "target get hit, or is it still open. Independent per signal; does not affect "
+            "future signals."
+        )
+        if not tranche_df.empty:
+            st.dataframe(tranche_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No BUY signals yet in this window to evaluate.")
 
     # =================================================================
     # 6b. CONDITION DIAGNOSTICS - answers "why no VALUE BUY signal?"
@@ -901,33 +835,33 @@ if data is not None and len(data) >= 60:
     # 8. HISTORICAL DATA TABLE
     # =================================================================
     st.markdown("---")
-    st.subheader("📚 Historical Data")
-    st.caption("Strategy History (Latest First)")
+    with st.expander("📚 Historical Data", expanded=False):
+        st.caption("Strategy History (Latest First)")
 
-    df_disp = data.reset_index()
-    df_disp['Date'] = df_disp['Date'].dt.strftime('%Y-%m-%d')
-    df_disp = df_disp.sort_values(by='Date', ascending=False)
+        df_disp = data.reset_index()
+        df_disp['Date'] = df_disp['Date'].dt.strftime('%Y-%m-%d')
+        df_disp = df_disp.sort_values(by='Date', ascending=False)
 
-    cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Price Change',
-            'EMA_20', 'VWAP', 'ATR_10', 'RSI_14', 'Stop', 'Target',
-            'Conviction', 'Signal', 'Reason']
+        cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Price Change',
+                'EMA_20', 'VWAP', 'ATR_10', 'RSI_14', 'Stop', 'Target',
+                'Conviction', 'Signal', 'Reason']
 
-    def row_styler(row):
-        if "VALUE" in str(row.Signal):
-            return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
-        if "MOMENTUM" in str(row.Signal):
-            return ['background-color: rgba(52, 152, 219, 0.2)'] * len(row)
-        return [''] * len(row)
+        def row_styler(row):
+            if "VALUE" in str(row.Signal):
+                return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
+            if "MOMENTUM" in str(row.Signal):
+                return ['background-color: rgba(52, 152, 219, 0.2)'] * len(row)
+            return [''] * len(row)
 
-    st.dataframe(
-        df_disp[cols].head(90).style.apply(row_styler, axis=1).format({
-            'Open': '{:.2f}', 'High': '{:.2f}', 'Low': '{:.2f}', 'Close': '{:.2f}',
-            'Price Change': '{:+.2f}%', 'Volume': '{:,.0f}', 'EMA_20': '{:.2f}',
-            'VWAP': '{:.2f}', 'ATR_10': '{:.2f}', 'RSI_14': '{:.1f}',
-            'Stop': '{:.2f}', 'Target': '{:.2f}',
-        }, na_rep="-"),
-        use_container_width=True
-    )
+        st.dataframe(
+            df_disp[cols].head(90).style.apply(row_styler, axis=1).format({
+                'Open': '{:.2f}', 'High': '{:.2f}', 'Low': '{:.2f}', 'Close': '{:.2f}',
+                'Price Change': '{:+.2f}%', 'Volume': '{:,.0f}', 'EMA_20': '{:.2f}',
+                'VWAP': '{:.2f}', 'ATR_10': '{:.2f}', 'RSI_14': '{:.1f}',
+                'Stop': '{:.2f}', 'Target': '{:.2f}',
+            }, na_rep="-"),
+            use_container_width=True
+        )
 
 elif data is not None:
     st.warning("Not enough historical data for reliable signal generation (need 60+ days).")

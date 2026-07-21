@@ -1,0 +1,94 @@
+Market,Tier,Name,Ticker
+US,Tier 1: Core Compounders,"Walmart (WMT)",WMT
+US,Tier 1: Core Compounders,"Eli Lilly (LLY)",LLY
+US,Tier 1: Core Compounders,"GE Aerospace (GE)",GE
+US,Tier 1: Core Compounders,"AbbVie (ABBV)",ABBV
+US,Tier 1: Core Compounders,"Honeywell (HON)",HON
+US,Tier 1: Core Compounders,"Vertex Pharmaceuticals (VRTX)",VRTX
+US,Tier 1: Core Compounders,"ASML Holding (ASML)",ASML
+US,Tier 1: Core Compounders,"Eaton Corp (ETN)",ETN
+US,Tier 1: Core Compounders,"Constellation Energy (CEG)",CEG
+US,Tier 1: Core Compounders,"MercadoLibre (MELI)",MELI
+US,Tier 2: Structural Growth,"Arista Networks (ANET)",ANET
+US,Tier 2: Structural Growth,"Palo Alto Networks (PANW)",PANW
+US,Tier 2: Structural Growth,"KLA Corp (KLAC)",KLAC
+US,Tier 2: Structural Growth,"Applied Materials (AMAT)",AMAT
+US,Tier 2: Structural Growth,"Marvell Technology (MRVL)",MRVL
+US,Tier 2: Structural Growth,"Qualcomm (QCOM)",QCOM
+US,Tier 2: Structural Growth,"CrowdStrike (CRWD)",CRWD
+US,Tier 2: Structural Growth,"Vertiv Holdings (VRT)",VRT
+US,Tier 2: Structural Growth,"Palantir Technologies (PLTR)",PLTR
+US,Tier 2: Structural Growth,"GE Vernova (GEV)",GEV
+US,Tier 3: Higher-Risk / Upside,"Arm Holdings (ARM)",ARM
+US,Tier 3: Higher-Risk / Upside,"AppLovin (APP)",APP
+US,Tier 3: Higher-Risk / Upside,"AST SpaceMobile (ASTS)",ASTS
+US,Tier 3: Higher-Risk / Upside,"TransMedics Group (TMDX)",TMDX
+US,Tier 3: Higher-Risk / Upside,"CRISPR Therapeutics (CRSP)",CRSP
+US,Other / Watchlist,"Rivian Automotive (RIVN)",RIVN
+US,Other / Watchlist,"Nio Inc. (NIO)",NIO
+US,Other / Watchlist,"XPeng Inc. (XPEV)",XPEV
+US,Other / Watchlist,"Tesla Inc. (TSLA)",TSLA
+US,Other / Watchlist,"Apple Inc. (AAPL)",AAPL
+US,Other / Watchlist,"Microsoft Corp (MSFT)",MSFT
+US,Other / Watchlist,"Alphabet Inc (GOOGL)",GOOGL
+US,Other / Watchlist,"Amazon.com Inc (AMZN)",AMZN
+US,Other / Watchlist,"NVIDIA Corp (NVDA)",NVDA
+US,Other / Watchlist,"Intel Corp (INTC)",INTC
+India,Tier 1: Core Compounders,"Multi Commodity Exchange (MCX)",MCX.NS
+India,Tier 1: Core Compounders,"HDFC Bank (HDFCBANK)",HDFCBANK.NS
+India,Tier 1: Core Compounders,"Larsen & Toubro (LT)",LT.NS
+India,Tier 1: Core Compounders,"Kotak Mahindra Bank (KOTAKBANK)",KOTAKBANK.NS
+India,Tier 1: Core Compounders,"Tata Consultancy Services (TCS)",TCS.NS
+India,Tier 1: Core Compounders,"Asian Paints (ASIANPAINT)",ASIANPAINT.NS
+India,Tier 1: Core Compounders,"Bajaj Auto (BAJAJ-AUTO)",BAJAJ-AUTO.NS
+India,Tier 1: Core Compounders,"Maruti Suzuki (MARUTI)",MARUTI.NS
+India,Tier 1: Core Compounders,"HDFC Asset Management (HDFCAMC)",HDFCAMC.NS
+India,Tier 1: Core Compounders,"Infosys (INFY)",INFY.NS
+India,Tier 2: Structural Growth,"CRISIL (CRISIL)",CRISIL.NS
+India,Tier 2: Structural Growth,"Zydus Lifesciences (ZYDUSLIFE)",ZYDUSLIFE.NS
+India,Tier 2: Structural Growth,"Supriya Lifescience (SUPRIYA)",SUPRIYA.NS
+India,Tier 2: Structural Growth,"Coforge (COFORGE)",COFORGE.NS
+India,Tier 2: Structural Growth,"Dixon Technologies (DIXON)",DIXON.NS
+India,Tier 2: Structural Growth,"Marksans Pharma (MARKSANS)",MARKSANS.NS
+India,Tier 2: Structural Growth,"Eicher Motors (EICHERMOT)",EICHERMOT.NS
+India,Tier 2: Structural Growth,"Narayana Hrudayalaya (NH)",NH.NS
+India,Tier 3: Tactical / Cyclical,"Federal Bank (FEDERALBNK)",FEDERALBNK.NS
+India,Tier 3: Tactical / Cyclical,"Ashiana Housing (ASHIANA)",ASHIANA.NS
+India,Tier 3: Tactical / Cyclical,"Pricol Limited (PRICOLLTD)",PRICOLLTD.NS
+India,Tier 3: Tactical / Cyclical,"Lupin (LUPIN)",LUPIN.NS
+India,Tier 3: Tactical / Cyclical,"Hero MotoCorp (HEROMOTOCO)",HEROMOTOCO.NS
+India,Tier 3: Tactical / Cyclical,"VST Tillers Tractors (VSTTILLERS)",VSTTILLERS.NS
+India,Tier 4: VRS New Recommendations,"Tinna Rubber & Infrastructure (TINNARUBR)",TINNARUBR.NS
+India,Tier 4: VRS New Recommendations,"Pitti Engineering (PITTIENG)",PITTIENG.NS
+India,Tier 4: VRS New Recommendations,"Styrenix Performance Materials (STYRENIX)",STYRENIX.NS
+India,Tier 4: VRS New Recommendations,"Aurionpro Solutions (AURIONPRO)",AURIONPRO.NS
+India,Tier 4: VRS New Recommendations,"Fineotex Chemical (FCL)",FCL.NS
+India,Tier 5: Green Energy,TDPOWERSYS,TDPOWERSYS.NS
+India,Tier 5: Green Energy,VISL,VISL.NS
+India,Tier 5: Green Energy,SYRMA,SYRMA.NS
+India,Tier 5: Green Energy,EBGNG,EBGNG.NS
+India,Tier 5: Green Energy,ATHERENERG,ATHERENERG.NS
+India,Tier 5: Green Energy,SANSERA,SANSERA.NS
+India,Tier 5: Green Energy,VOGL,VOGL.NS
+India,Tier 5: Green Energy,AVALON,AVALON.NS
+India,Tier 5: Green Energy,FIEMIND,FIEMIND.NS
+India,Tier 5: Green Energy,EMMVEE,EMMVEE.NS
+India,Tier 5: Green Energy,QPOWER,QPOWER.NS
+India,Tier 5: Green Energy,POCL,POCL.NS
+India,Tier 5: Green Energy,SBCL,SBCL.NS
+India,Tier 5: Green Energy,NEOGEN,NEOGEN.NS
+India,Tier 5: Green Energy,SKIPPER,SKIPPER.NS
+India,Tier 5: Green Energy,INOXINDIA,INOXINDIA.NS
+India,Tier 5: Green Energy,ENRIN,ENRIN.NS
+India,Tier 5: Green Energy,VAML,VAML.NS
+India,Tier 5: Green Energy,THERMAX,THERMAX.NS
+India,Tier 5: Green Energy,BORORENEW,BORORENEW.NS
+India,Tier 5: Green Energy,HBLENGINE,HBLENGINE.NS
+India,Tier 5: Green Energy,WAAREEENER,WAAREEENER.NS
+India,Tier 5: Green Energy,TRITURBINE,TRITURBINE.NS
+India,Tier 5: Green Energy,LIQUIDCASE,LIQUIDCASE.NS
+India,Tier 5: Green Energy,JASH,JASH.NS
+India,Tier 5: Green Energy,VEDL,VEDL.NS
+India,Tier 5: Green Energy,GANECOS,GANECOS.NS
+India,Tier 5: Green Energy,POWERMECH,POWERMECH.NS
+India,Tier 5: Green Energy,JAINREC,JAINREC.NS
