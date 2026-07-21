@@ -787,7 +787,38 @@ if data is not None and len(data) >= 60:
             st.info("No BUY signals yet in this window to evaluate.")
 
     # =================================================================
-    # 6b. CONDITION DIAGNOSTICS - answers "why no VALUE BUY signal?"
+    # 6b. HISTORICAL DATA TABLE
+    # =================================================================
+    with st.expander("📚 Historical Data", expanded=False):
+        st.caption("Strategy History (Latest First)")
+
+        df_disp = data.reset_index()
+        df_disp['Date'] = df_disp['Date'].dt.strftime('%Y-%m-%d')
+        df_disp = df_disp.sort_values(by='Date', ascending=False)
+
+        cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Price Change',
+                'EMA_20', 'VWAP', 'ATR_10', 'RSI_14', 'Stop', 'Target',
+                'Conviction', 'Signal', 'Reason']
+
+        def row_styler(row):
+            if "VALUE" in str(row.Signal):
+                return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
+            if "MOMENTUM" in str(row.Signal):
+                return ['background-color: rgba(52, 152, 219, 0.2)'] * len(row)
+            return [''] * len(row)
+
+        st.dataframe(
+            df_disp[cols].head(90).style.apply(row_styler, axis=1).format({
+                'Open': '{:.2f}', 'High': '{:.2f}', 'Low': '{:.2f}', 'Close': '{:.2f}',
+                'Price Change': '{:+.2f}%', 'Volume': '{:,.0f}', 'EMA_20': '{:.2f}',
+                'VWAP': '{:.2f}', 'ATR_10': '{:.2f}', 'RSI_14': '{:.1f}',
+                'Stop': '{:.2f}', 'Target': '{:.2f}',
+            }, na_rep="-"),
+            use_container_width=True
+        )
+
+    # =================================================================
+    # 6c. CONDITION DIAGNOSTICS - answers "why no VALUE BUY signal?"
     # =================================================================
     with st.expander("🔍 Why no VALUE BUY signal? Condition breakdown"):
         n = len(data)
@@ -830,38 +861,6 @@ if data is not None and len(data) >= 60:
         st.dataframe(pd.DataFrame(backtest_summary), use_container_width=True, hide_index=True)
     else:
         st.info("Not enough historical BUY signals yet to backtest.")
-
-    # =================================================================
-    # 8. HISTORICAL DATA TABLE
-    # =================================================================
-    st.markdown("---")
-    with st.expander("📚 Historical Data", expanded=False):
-        st.caption("Strategy History (Latest First)")
-
-        df_disp = data.reset_index()
-        df_disp['Date'] = df_disp['Date'].dt.strftime('%Y-%m-%d')
-        df_disp = df_disp.sort_values(by='Date', ascending=False)
-
-        cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Price Change',
-                'EMA_20', 'VWAP', 'ATR_10', 'RSI_14', 'Stop', 'Target',
-                'Conviction', 'Signal', 'Reason']
-
-        def row_styler(row):
-            if "VALUE" in str(row.Signal):
-                return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
-            if "MOMENTUM" in str(row.Signal):
-                return ['background-color: rgba(52, 152, 219, 0.2)'] * len(row)
-            return [''] * len(row)
-
-        st.dataframe(
-            df_disp[cols].head(90).style.apply(row_styler, axis=1).format({
-                'Open': '{:.2f}', 'High': '{:.2f}', 'Low': '{:.2f}', 'Close': '{:.2f}',
-                'Price Change': '{:+.2f}%', 'Volume': '{:,.0f}', 'EMA_20': '{:.2f}',
-                'VWAP': '{:.2f}', 'ATR_10': '{:.2f}', 'RSI_14': '{:.1f}',
-                'Stop': '{:.2f}', 'Target': '{:.2f}',
-            }, na_rep="-"),
-            use_container_width=True
-        )
 
 elif data is not None:
     st.warning("Not enough historical data for reliable signal generation (need 60+ days).")
