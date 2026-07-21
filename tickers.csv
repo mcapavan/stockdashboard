@@ -1,4 +1,14 @@
 Market,Tier,Name,Ticker
+US,Other / Watchlist,"Rivian Automotive (RIVN)",RIVN
+US,Other / Watchlist,"Nio Inc. (NIO)",NIO
+US,Other / Watchlist,"XPeng Inc. (XPEV)",XPEV
+US,Other / Watchlist,"Tesla Inc. (TSLA)",TSLA
+US,Other / Watchlist,"Apple Inc. (AAPL)",AAPL
+US,Other / Watchlist,"Microsoft Corp (MSFT)",MSFT
+US,Other / Watchlist,"Alphabet Inc (GOOGL)",GOOGL
+US,Other / Watchlist,"Amazon.com Inc (AMZN)",AMZN
+US,Other / Watchlist,"NVIDIA Corp (NVDA)",NVDA
+US,Other / Watchlist,"Intel Corp (INTC)",INTC
 US,Tier 1: Core Compounders,"Walmart (WMT)",WMT
 US,Tier 1: Core Compounders,"Eli Lilly (LLY)",LLY
 US,Tier 1: Core Compounders,"GE Aerospace (GE)",GE
@@ -24,16 +34,6 @@ US,Tier 3: Higher-Risk / Upside,"AppLovin (APP)",APP
 US,Tier 3: Higher-Risk / Upside,"AST SpaceMobile (ASTS)",ASTS
 US,Tier 3: Higher-Risk / Upside,"TransMedics Group (TMDX)",TMDX
 US,Tier 3: Higher-Risk / Upside,"CRISPR Therapeutics (CRSP)",CRSP
-US,Other / Watchlist,"Rivian Automotive (RIVN)",RIVN
-US,Other / Watchlist,"Nio Inc. (NIO)",NIO
-US,Other / Watchlist,"XPeng Inc. (XPEV)",XPEV
-US,Other / Watchlist,"Tesla Inc. (TSLA)",TSLA
-US,Other / Watchlist,"Apple Inc. (AAPL)",AAPL
-US,Other / Watchlist,"Microsoft Corp (MSFT)",MSFT
-US,Other / Watchlist,"Alphabet Inc (GOOGL)",GOOGL
-US,Other / Watchlist,"Amazon.com Inc (AMZN)",AMZN
-US,Other / Watchlist,"NVIDIA Corp (NVDA)",NVDA
-US,Other / Watchlist,"Intel Corp (INTC)",INTC
 India,Tier 1: Core Compounders,"Multi Commodity Exchange (MCX)",MCX.NS
 India,Tier 1: Core Compounders,"HDFC Bank (HDFCBANK)",HDFCBANK.NS
 India,Tier 1: Core Compounders,"Larsen & Toubro (LT)",LT.NS

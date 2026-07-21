@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Stocks Strategy Dashboard Pro", layout="wide")
+st.set_page_config(page_title="Portfolio Strategy Dashboard", layout="wide")
 
 # Collects caught exceptions so they're surfaced in the UI instead of
 # silently swallowed. Reset each script run; cached functions won't
@@ -223,22 +223,14 @@ st.session_state["last_ticker_symbol"] = ticker_symbol
 st.sidebar.markdown("---")
 
 # --- Strategy parameters, exposed so you can tune without editing code ---
-st.sidebar.subheader("⚙️ Signal Thresholds")
-rsi_low = st.sidebar.slider("Value Buy: RSI lower bound (avoid falling knives)", 10, 40, 25)
-rsi_high = st.sidebar.slider("Value Buy: RSI upper bound (must be genuinely soft)", 30, 50, 40)
-vol_confirm_mult = st.sidebar.slider("Value Buy: min volume vs 30d avg", 0.8, 2.0, 1.1, 0.1)
-momentum_vol_mult = st.sidebar.slider("Momentum Buy: min volume vs 30d avg", 1.0, 2.5, 1.3, 0.1)
-momentum_rsi_cap = st.sidebar.slider("Momentum Buy: max RSI (avoid buying blow-offs)", 60, 85, 75)
-atr_stop_mult = st.sidebar.slider("Stop: ATR multiplier", 1.0, 5.0, 3.0, 0.5)
-atr_target_mult = st.sidebar.slider("Target: ATR multiplier", 2.0, 10.0, 6.0, 0.5)
-
-st.sidebar.markdown("---")
-
-if st.sidebar.button("🔄 Clear cache & retry data fetch"):
-    get_data.clear()
-    get_analyst_target.clear()
-    get_currency_symbol.clear()
-    st.rerun()
+with st.sidebar.expander("⚙️ Signal Thresholds", expanded=False):
+    rsi_low = st.slider("Value Buy: RSI lower bound (avoid falling knives)", 10, 40, 25)
+    rsi_high = st.slider("Value Buy: RSI upper bound (must be genuinely soft)", 30, 50, 40)
+    vol_confirm_mult = st.slider("Value Buy: min volume vs 30d avg", 0.8, 2.0, 1.1, 0.1)
+    momentum_vol_mult = st.slider("Momentum Buy: min volume vs 30d avg", 1.0, 2.5, 1.3, 0.1)
+    momentum_rsi_cap = st.slider("Momentum Buy: max RSI (avoid buying blow-offs)", 60, 85, 75)
+    atr_stop_mult = st.slider("Stop: ATR multiplier", 1.0, 5.0, 3.0, 0.5)
+    atr_target_mult = st.slider("Target: ATR multiplier", 2.0, 10.0, 6.0, 0.5)
 
 st.sidebar.markdown("---")
 
@@ -358,7 +350,7 @@ def render_portfolio_scan(section_id, section_title, button_label, tier_names):
 # =====================================================================
 # APP HEADER
 # =====================================================================
-st.title("📊 Pension Portfolio Strategy Dashboard")
+st.title("📊 Portfolio Strategy Dashboard")
 st.caption(
     "DCA / scale-in signal scanning across your US and India tiers, plus a full "
     "single-stock deep dive with backtesting and risk-level tracking."
@@ -433,40 +425,41 @@ if data is not None and len(data) >= 60:
     # =================================================================
     # 2. RISK-REWARD CALCULATOR (unchanged logic, still useful standalone)
     # =================================================================
-    st.sidebar.subheader("🧮 Interactive Risk-Reward Calculator")
-    calc_entry = st.sidebar.number_input(
-        f"Hypothetical Entry Price ({currency_symbol})",
-        value=round(current_market_price, 2), step=0.1
-    )
-    calc_size = st.sidebar.number_input("Position Size (Shares)", value=100, step=10)
+    with st.sidebar.expander("🧮 Interactive Risk-Reward Calculator", expanded=False):
+        calc_entry = st.number_input(
+            f"Hypothetical Entry Price ({currency_symbol})",
+            value=round(current_market_price, 2), step=0.1
+        )
+        calc_size = st.number_input("Position Size (Shares)", value=100, step=10)
 
-    risk_mode = st.sidebar.radio("Stop Loss Metric", ["ATR Multiplier", "Percentage Drop"])
-    if risk_mode == "ATR Multiplier":
-        atr_mult = st.sidebar.slider("ATR Multiplier (Risk)", 1.0, 5.0, 3.0, 0.5)
-        calculated_risk_per_share = current_atr * atr_mult
-    else:
-        pct_drop = st.sidebar.slider("Percent Risk (%)", 1.0, 20.0, 5.0, 0.5)
-        calculated_risk_per_share = calc_entry * (pct_drop / 100.0)
-    calc_stop = calc_entry - calculated_risk_per_share
+        risk_mode = st.radio("Stop Loss Metric", ["ATR Multiplier", "Percentage Drop"])
+        if risk_mode == "ATR Multiplier":
+            atr_mult = st.slider("ATR Multiplier (Risk)", 1.0, 5.0, 3.0, 0.5)
+            calculated_risk_per_share = current_atr * atr_mult
+        else:
+            pct_drop = st.slider("Percent Risk (%)", 1.0, 20.0, 5.0, 0.5)
+            calculated_risk_per_share = calc_entry * (pct_drop / 100.0)
+        calc_stop = calc_entry - calculated_risk_per_share
 
-    rr_ratio = st.sidebar.slider("Target Risk-Reward Ratio (R:R)", 1.0, 5.0, 2.0, 0.5)
-    calc_target = calc_entry + (calculated_risk_per_share * rr_ratio)
+        rr_ratio = st.slider("Target Risk-Reward Ratio (R:R)", 1.0, 5.0, 2.0, 0.5)
+        calc_target = calc_entry + (calculated_risk_per_share * rr_ratio)
 
-    total_cost = calc_entry * calc_size
-    total_risk = calculated_risk_per_share * calc_size
-    total_reward = (calc_target - calc_entry) * calc_size
+        total_cost = calc_entry * calc_size
+        total_risk = calculated_risk_per_share * calc_size
+        total_reward = (calc_target - calc_entry) * calc_size
 
-    st.sidebar.markdown("**Calculator Output:**")
-    st.sidebar.info(
-        f"🛑 **Suggested Stop:** {currency_symbol}{calc_stop:.2f}\n\n"
-        f"🎯 **Suggested Target:** {currency_symbol}{calc_target:.2f}"
-    )
-    col_c1, col_c2 = st.sidebar.columns(2)
-    with col_c1:
-        st.metric("Total Risk", f"{currency_symbol}{total_risk:.2f}", delta_color="inverse")
-    with col_c2:
-        st.metric("Total Reward", f"{currency_symbol}{total_reward:.2f}")
-    st.sidebar.caption(f"Total Capital Exposure: {currency_symbol}{total_cost:,.2f}")
+        st.markdown("**Calculator Output:**")
+        st.info(
+            f"🛑 **Suggested Stop:** {currency_symbol}{calc_stop:.2f}\n\n"
+            f"🎯 **Suggested Target:** {currency_symbol}{calc_target:.2f}"
+        )
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.metric("Total Risk", f"{currency_symbol}{total_risk:.2f}", delta_color="inverse")
+        with col_c2:
+            st.metric("Total Reward", f"{currency_symbol}{total_reward:.2f}")
+        st.caption(f"Total Capital Exposure: {currency_symbol}{total_cost:,.2f}")
+
     st.sidebar.markdown("---")
 
     # =================================================================
@@ -866,3 +859,15 @@ elif data is not None:
     st.warning("Not enough historical data for reliable signal generation (need 60+ days).")
 else:
     st.error("Error loading data. Check ticker.")
+
+# =========================================================================
+# CLEAR CACHE - placed last and unconditionally, so it always renders
+# (even if the data fetch above failed) and always sits at the true
+# bottom of the sidebar, after both expanders above.
+# =========================================================================
+st.sidebar.markdown("---")
+if st.sidebar.button("🔄 Clear cache & retry data fetch"):
+    get_data.clear()
+    get_analyst_target.clear()
+    get_currency_symbol.clear()
+    st.rerun()
