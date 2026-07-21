@@ -237,6 +237,13 @@ else:
     )
     ticker_symbol = tier_stocks[selected_name]
 
+# Auto-collapse the Portfolio Scan results table the moment the active
+# ticker changes - whether that change came from clicking a scan row or
+# from manually picking a different ticker in the dropdowns above.
+if st.session_state.get("last_ticker_symbol") is not None and st.session_state["last_ticker_symbol"] != ticker_symbol:
+    st.session_state["scan_expanded"] = False
+st.session_state["last_ticker_symbol"] = ticker_symbol
+
 st.sidebar.markdown("---")
 
 # --- Strategy parameters, exposed so you can tune without editing code ---
@@ -263,6 +270,7 @@ st.caption(
 run_scan = st.button("🔍 Run Portfolio Scan")
 
 if run_scan:
+    st.session_state["scan_expanded"] = True
     all_portfolio_stocks = {}
     ticker_lookup = {}  # ticker -> (tier_name, display_name), used for click-to-navigate
     for tier_name in ["Tier 1: Core Compounders", "Tier 2: Structural Growth", "Tier 3: Higher-Risk / Upside"]:
@@ -319,15 +327,16 @@ if "scan_df_cache" in st.session_state:
             return ['background-color: rgba(52, 152, 219, 0.2)'] * len(row)
         return [''] * len(row)
 
-    st.caption("👉 Click any row to jump straight to that ticker's full analysis below.")
-    scan_event = st.dataframe(
-        scan_df.style.apply(scan_row_styler, axis=1).format({
-            'Price': '{:.2f}', 'Chg %': '{:+.2f}%', 'RSI': '{:.1f}',
-            'Stop': '{:.2f}', 'Target': '{:.2f}',
-        }),
-        use_container_width=True, hide_index=True,
-        on_select="rerun", selection_mode="single-row", key="scan_table_select",
-    )
+    with st.expander("📋 Scan Results", expanded=st.session_state.get("scan_expanded", True)):
+        st.caption("👉 Click any row to jump straight to that ticker's full analysis below.")
+        scan_event = st.dataframe(
+            scan_df.style.apply(scan_row_styler, axis=1).format({
+                'Price': '{:.2f}', 'Chg %': '{:+.2f}%', 'RSI': '{:.1f}',
+                'Stop': '{:.2f}', 'Target': '{:.2f}',
+            }),
+            use_container_width=True, hide_index=True,
+            on_select="rerun", selection_mode="single-row", key="scan_table_select",
+        )
 
     selected_rows = []
     if scan_event and hasattr(scan_event, "selection"):
