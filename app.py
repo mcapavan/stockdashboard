@@ -69,28 +69,42 @@ def get_data(ticker, period="2y"):
 
 
 @st.cache_data(ttl=3600)
-def get_analyst_target(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        targets = stock.analyst_price_targets
-        if isinstance(targets, dict):
-            return targets.get("mean")
-        return None
-    except Exception as e:
-        record_warning("get_analyst_target", ticker, e)
-        return None
+def get_ticker_info(ticker):
+    """Consolidated fetch for currency, company name, and analyst target.
 
+    These were previously three separate cached functions, each
+    independently calling yf.Ticker(ticker).info for the SAME ticker -
+    tripling requests to Yahoo's most rate-limit-sensitive endpoint for
+    no benefit. One retry-backed fetch here instead of three bare ones.
+    """
+    result = {"currency_symbol": "$", "company_name": ticker, "analyst_target": None}
+    info, last_error = None, None
+    for attempt in range(3):
+        try:
+            info = yf.Ticker(ticker).info
+            if info:
+                break
+        except Exception as e:
+            last_error = e
+        time.sleep(1.5 * (attempt + 1))
 
-@st.cache_data(ttl=3600)
-def get_currency_symbol(ticker):
-    try:
-        info = yf.Ticker(ticker).info
-        currency = info.get('currency') or 'USD'
-    except Exception as e:
-        record_warning("get_currency_symbol", ticker, e)
-        currency = 'USD'
+    if not info:
+        record_warning("get_ticker_info", ticker, last_error or "empty info after 3 attempts")
+        return result
+
+    currency = info.get('currency') or 'USD'
     symbol_map = {'USD': '$', 'INR': '₹', 'EUR': '€', 'GBP': '£', 'JPY': '¥'}
-    return symbol_map.get(currency, currency + ' ')
+    result["currency_symbol"] = symbol_map.get(currency, currency + ' ')
+    result["company_name"] = info.get('longName', ticker)
+
+    try:
+        targets = yf.Ticker(ticker).analyst_price_targets
+        if isinstance(targets, dict):
+            result["analyst_target"] = targets.get("mean")
+    except Exception as e:
+        record_warning("get_ticker_info(analyst_target)", ticker, e)
+
+    return result
 
 
 def compute_latest_snapshot(ticker, rsi_low, rsi_high, vol_confirm_mult,
@@ -392,7 +406,8 @@ st.header("📌 Single Stock Deep Dive")
 st.caption("Full signal history, chart, backtest, and tranche tracking for the ticker selected in the sidebar.")
 
 data = get_data(ticker_symbol)
-currency_symbol = get_currency_symbol(ticker_symbol)
+ticker_info = get_ticker_info(ticker_symbol)
+currency_symbol = ticker_info["currency_symbol"]
 
 if data is not None and len(data) >= 60:
 
@@ -599,7 +614,7 @@ if data is not None and len(data) >= 60:
     signal_text = data.iloc[-2]["Signal"]
     signal_date_str = signal_date.strftime("%d %b %Y")
 
-    analyst_target = get_analyst_target(ticker_symbol)
+    analyst_target = ticker_info["analyst_target"]
     if analyst_target is not None:
         target_upside = ((analyst_target / latest_row['Close']) - 1) * 100
     else:
@@ -659,12 +674,7 @@ if data is not None and len(data) >= 60:
     # =================================================================
     # 5. UI HEADER
     # =================================================================
-    try:
-        company_name = yf.Ticker(ticker_symbol).info.get('longName', ticker_symbol)
-        st.subheader(f"📊 {company_name} ({ticker_symbol})")
-    except Exception as e:
-        record_warning("company_name_lookup", ticker_symbol, e)
-        st.subheader(f"📊 {ticker_symbol}")
+    st.subheader(f"📊 {ticker_info['company_name']} ({ticker_symbol})")
 
     if DATA_WARNINGS:
         with st.expander(f"⚠️ {len(DATA_WARNINGS)} data fetch warning(s) - click to view"):
@@ -868,6 +878,5 @@ else:
 st.sidebar.markdown("---")
 if st.sidebar.button("🔄 Clear cache & retry data fetch"):
     get_data.clear()
-    get_analyst_target.clear()
-    get_currency_symbol.clear()
+    get_ticker_info.clear()
     st.rerun()
