@@ -246,8 +246,6 @@ with st.sidebar.expander("⚙️ Signal Thresholds", expanded=False):
     atr_stop_mult = st.slider("Stop: ATR multiplier", 1.0, 5.0, 3.0, 0.5)
     atr_target_mult = st.slider("Target: ATR multiplier", 2.0, 10.0, 6.0, 0.5)
 
-st.sidebar.markdown("---")
-
 def scan_row_styler(row):
     if "VALUE" in str(row.Signal):
         return ['background-color: rgba(46, 204, 113, 0.2)'] * len(row)
@@ -256,23 +254,18 @@ def scan_row_styler(row):
     return [''] * len(row)
 
 
-def render_portfolio_scan(section_id, section_title, button_label, tier_names):
-    """Renders one market's Portfolio Scan: button + results table + click-to-navigate.
-    section_id must be unique per market (e.g. 'us', 'india') - it's used to
-    namespace all the session_state keys and widget keys so the two scans
-    don't collide with each other."""
+def render_scan_trigger(section_id, market_label, button_label, tier_names):
+    """SIDEBAR: the button, ticker count, last-scan time, and the actual
+    scanning + caching logic. Nothing wide/tabular renders here - just
+    enough to trigger a scan and see quick feedback."""
+    expanded_key = f"scan_expanded_{section_id}"
     cache_key = f"scan_df_cache_{section_id}"
     lookup_key = f"scan_ticker_lookup_{section_id}"
-    expanded_key = f"scan_expanded_{section_id}"
-    table_widget_key = f"scan_table_select_{section_id}"
-    clear_flag_key = f"clear_scan_selection_{section_id}"
 
     total_tickers = sum(len(PORTFOLIO_TIERS.get(t, {})) for t in tier_names)
     last_scan = st.session_state.get(f"last_scan_time_{section_id}", "not run yet")
-
-    st.subheader(section_title)
-    st.caption(f"📦 {total_tickers} tickers tracked · 🕒 Last scan: {last_scan}")
-    run_scan = st.button(button_label, key=f"run_scan_btn_{section_id}")
+    st.sidebar.caption(f"{market_label}: {total_tickers} tickers · Last scan: {last_scan}")
+    run_scan = st.sidebar.button(button_label, key=f"run_scan_btn_{section_id}")
 
     if run_scan:
         st.session_state[expanded_key] = True
@@ -287,7 +280,7 @@ def render_portfolio_scan(section_id, section_title, button_label, tier_names):
         st.session_state[lookup_key] = ticker_lookup
 
         scan_rows = []
-        progress = st.progress(0.0, text="Scanning tickers...")
+        progress = st.sidebar.progress(0.0, text="Scanning tickers...")
         tickers_list = list(all_stocks.items())
         for i, (name, (tkr, short_tier)) in enumerate(tickers_list):
             snap = compute_latest_snapshot(
@@ -298,7 +291,7 @@ def render_portfolio_scan(section_id, section_title, button_label, tier_names):
                 snap["Name"] = name
                 snap["Tier"] = short_tier
                 scan_rows.append(snap)
-            progress.progress((i + 1) / len(tickers_list), text=f"Scanning tickers... ({tkr})")
+            progress.progress((i + 1) / len(tickers_list), text=f"Scanning... ({tkr})")
         progress.empty()
 
         if scan_rows:
@@ -309,57 +302,86 @@ def render_portfolio_scan(section_id, section_title, button_label, tier_names):
             n_value = (scan_df['Signal'] == "💎 VALUE BUY").sum()
             n_momentum = (scan_df['Signal'] == "🚀 MOMENTUM BUY").sum()
             if n_value or n_momentum:
-                st.success(f"💎 {n_value} Value Buy · 🚀 {n_momentum} Momentum Buy flagged today.")
+                st.sidebar.success(f"💎 {n_value} · 🚀 {n_momentum} flagged today.")
             else:
-                st.info("No BUY signals across this portfolio today.")
+                st.sidebar.info("No BUY signals today.")
         else:
-            st.warning("No data returned for any ticker in this scan - check network/ticker validity.")
+            st.sidebar.warning("No data returned - check network/tickers.")
 
-    # Render from cache (not just inside `if run_scan`) so the table and its
-    # click-to-navigate behaviour survive the rerun triggered by a row click.
-    if cache_key in st.session_state:
-        scan_df = st.session_state[cache_key]
-        ticker_lookup = st.session_state.get(lookup_key, {})
 
-        # A row selection made on a previous run to trigger navigation needs
-        # to be cleared here, BEFORE the widget is recreated - otherwise the
-        # checkbox stays ticked forever and fights any later manual change
-        # to the "Select Stock" dropdown.
-        if st.session_state.pop(clear_flag_key, False):
-            st.session_state[table_widget_key] = {"selection": {"rows": [], "columns": []}}
+def render_scan_results(section_id, section_title):
+    """MAIN AREA: only renders anything if this section has cached results -
+    keeps the main page clean (Single Stock Deep Dive visible up top) until
+    a scan has actually been run from the sidebar."""
+    cache_key = f"scan_df_cache_{section_id}"
+    if cache_key not in st.session_state:
+        return
 
-        with st.expander("📋 Scan Results", expanded=st.session_state.get(expanded_key, True)):
-            st.caption("👉 Click any row to jump straight to that ticker's full analysis below.")
-            display_cols = [c for c in scan_df.columns if c != "Ticker"]
-            scan_event = st.dataframe(
-                scan_df.style.apply(scan_row_styler, axis=1).format({
-                    'Price': '{:.2f}', 'Chg %': '{:+.2f}%', 'RSI': '{:.1f}',
-                    'Stop': '{:.2f}', 'Target': '{:.2f}',
-                }),
-                use_container_width=True, hide_index=True, column_order=display_cols,
-                on_select="rerun", selection_mode="single-row", key=table_widget_key,
-            )
+    lookup_key = f"scan_ticker_lookup_{section_id}"
+    expanded_key = f"scan_expanded_{section_id}"
+    table_widget_key = f"scan_table_select_{section_id}"
+    clear_flag_key = f"clear_scan_selection_{section_id}"
 
-        selected_rows = []
-        if scan_event and hasattr(scan_event, "selection"):
-            selected_rows = scan_event.selection.get("rows", [])
-        elif isinstance(scan_event, dict):
-            selected_rows = scan_event.get("selection", {}).get("rows", [])
+    scan_df = st.session_state[cache_key]
+    ticker_lookup = st.session_state.get(lookup_key, {})
 
-        if selected_rows:
-            clicked_ticker = scan_df.iloc[selected_rows[0]]["Ticker"]
-            if clicked_ticker in ticker_lookup:
-                jump_tier, jump_name = ticker_lookup[clicked_ticker]
-                # Only trigger a jump if this isn't already the selected ticker
-                # (avoids an infinite rerun loop once the click has been applied).
-                if st.session_state.get("tier_select") != jump_tier or st.session_state.get("stock_select") != jump_name:
-                    st.session_state["pending_jump_tier"] = jump_tier
-                    st.session_state["pending_jump_stock"] = jump_name
-                    # Schedule the checkbox to be cleared on the very next run,
-                    # once it's done its job of triggering this navigation.
-                    st.session_state[clear_flag_key] = True
-                    st.rerun()
+    st.subheader(section_title)
 
+    # A row selection made on a previous run to trigger navigation needs
+    # to be cleared here, BEFORE the widget is recreated - otherwise the
+    # checkbox stays ticked forever and fights any later manual change
+    # to the "Select Stock" dropdown.
+    if st.session_state.pop(clear_flag_key, False):
+        st.session_state[table_widget_key] = {"selection": {"rows": [], "columns": []}}
+
+    with st.expander("📋 Scan Results", expanded=st.session_state.get(expanded_key, True)):
+        st.caption("👉 Click any row to jump straight to that ticker's full analysis below.")
+        display_cols = [c for c in scan_df.columns if c != "Ticker"]
+        scan_event = st.dataframe(
+            scan_df.style.apply(scan_row_styler, axis=1).format({
+                'Price': '{:.2f}', 'Chg %': '{:+.2f}%', 'RSI': '{:.1f}',
+                'Stop': '{:.2f}', 'Target': '{:.2f}',
+            }),
+            use_container_width=True, hide_index=True, column_order=display_cols,
+            on_select="rerun", selection_mode="single-row", key=table_widget_key,
+        )
+
+    selected_rows = []
+    if scan_event and hasattr(scan_event, "selection"):
+        selected_rows = scan_event.selection.get("rows", [])
+    elif isinstance(scan_event, dict):
+        selected_rows = scan_event.get("selection", {}).get("rows", [])
+
+    if selected_rows:
+        clicked_ticker = scan_df.iloc[selected_rows[0]]["Ticker"]
+        if clicked_ticker in ticker_lookup:
+            jump_tier, jump_name = ticker_lookup[clicked_ticker]
+            # Only trigger a jump if this isn't already the selected ticker
+            # (avoids an infinite rerun loop once the click has been applied).
+            if st.session_state.get("tier_select") != jump_tier or st.session_state.get("stock_select") != jump_name:
+                st.session_state["pending_jump_tier"] = jump_tier
+                st.session_state["pending_jump_stock"] = jump_name
+                # Schedule the checkbox to be cleared on the very next run,
+                # once it's done its job of triggering this navigation.
+                st.session_state[clear_flag_key] = True
+                st.rerun()
+
+
+US_TIER_NAMES = ["🇺🇸 US Tier 1: Core Compounders", "🇺🇸 US Tier 2: Structural Growth", "🇺🇸 US Tier 3: Higher-Risk / Upside"]
+INDIA_TIER_NAMES = [
+    "🇮🇳 India Tier 1: Core Compounders", "🇮🇳 India Tier 2: Structural Growth",
+    "🇮🇳 India Tier 3: Tactical / Cyclical", "🇮🇳 India Tier 4: VRS New Recommendations",
+    "🇮🇳 India Tier 5: Green Energy",
+]
+
+# =====================================================================
+# SIDEBAR: PORTFOLIO SCAN TRIGGERS
+# =====================================================================
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔍 Portfolio Scans")
+render_scan_trigger("us", "🇺🇸 US", "🔍 Run US Portfolio Scan", US_TIER_NAMES)
+st.sidebar.markdown("")
+render_scan_trigger("india", "🇮🇳 India", "🔍 Run India Portfolio Scan", INDIA_TIER_NAMES)
 
 # =====================================================================
 # APP HEADER
@@ -372,36 +394,20 @@ st.caption(
 st.markdown("---")
 
 # =====================================================================
-# PORTFOLIO SCAN - US and India run as two fully independent sections
+# PORTFOLIO SCAN RESULTS - only appears once a scan has actually been run
 # =====================================================================
-st.header("🔍 Portfolio Scans")
-st.caption(
-    "Today's signal across your portfolio, using the same thresholds set in the "
-    "sidebar. Use this to see which names are flashing a signal before drilling "
-    "into any single ticker below - click any result row to jump straight there."
-)
+_scan_results_shown = False
+if "scan_df_cache_us" in st.session_state:
+    render_scan_results("us", "🇺🇸 US Portfolio Scan — Tier 1 / 2 / 3")
+    _scan_results_shown = True
+if "scan_df_cache_india" in st.session_state:
+    if _scan_results_shown:
+        st.markdown("---")
+    render_scan_results("india", "🇮🇳 India Portfolio Scan — Tier 1 / 2 / 3 / 4 / 5")
+    _scan_results_shown = True
+if _scan_results_shown:
+    st.markdown("---")
 
-render_portfolio_scan(
-    section_id="us",
-    section_title="🇺🇸 US Portfolio Scan — Tier 1 / 2 / 3",
-    button_label="🔍 Run US Portfolio Scan",
-    tier_names=["🇺🇸 US Tier 1: Core Compounders", "🇺🇸 US Tier 2: Structural Growth", "🇺🇸 US Tier 3: Higher-Risk / Upside"],
-)
-
-st.markdown("---")
-
-render_portfolio_scan(
-    section_id="india",
-    section_title="🇮🇳 India Portfolio Scan — Tier 1 / 2 / 3 / 4 / 5",
-    button_label="🔍 Run India Portfolio Scan",
-    tier_names=[
-        "🇮🇳 India Tier 1: Core Compounders", "🇮🇳 India Tier 2: Structural Growth",
-        "🇮🇳 India Tier 3: Tactical / Cyclical", "🇮🇳 India Tier 4: VRS New Recommendations",
-        "🇮🇳 India Tier 5: Green Energy",
-    ],
-)
-
-st.markdown("---")
 st.header("📌 Single Stock Deep Dive")
 st.caption("Full signal history, chart, backtest, and tranche tracking for the ticker selected in the sidebar.")
 
